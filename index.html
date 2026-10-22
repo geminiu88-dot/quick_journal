@@ -100,7 +100,8 @@
   <span class="jonly"><button class="main" id="copy">复制日志</button>
   <button id="week" title="把每周回顾的日期和统计数字更新到今天">周五更新统计</button>
   <button id="hist">以前的日志</button>
-  <button id="imp">导入现有日志</button></span>
+  <button id="imp">导入现有日志</button>
+  <button id="sample">格式范本</button></span>
   <span class="tonly"><button class="main" id="xlsxOut">下载Excel</button>
   <label class="btn">导入Excel<input type="file" id="xlsxIn" accept=".xlsx" hidden></label></span>
   <button id="export">备份到文件</button>
@@ -121,6 +122,10 @@
 <dialog id="histDlg">
   <p><select id="histSel"></select> <button id="histClose">关闭</button></p>
   <textarea id="histText" readonly></textarea>
+</dialog>
+<dialog id="sampleDlg">
+  <p>日志格式范本（日志格式-BC组员-2251023）<button id="sampleClose" style="float:right">关闭</button></p>
+  <textarea id="sampleText" readonly></textarea>
 </dialog>
 <dialog id="impDlg">
   <p>把现有的日志文字整篇粘贴进来（规则部分可以不要），按“检查”。</p>
@@ -364,10 +369,25 @@ function items(list, withCat) {
 function fitSelect(sel) { sel.style.width = sel.options[sel.selectedIndex].text.length + 0.2 + "em"; sel.classList.toggle("none", sel.value === ""); }
 function placeEnd(n) { const r = document.createRange(); r.selectNodeContents(n); r.collapse(false); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
 
+// Hours are written the group leader's way: 4h15 = 4 hours 15 minutes, 4h = 4 hours, "+"/"-" at the end.
+// Typing 1.5, 1.5h, 1:30, 90m or 1h30 all mean the same; the box is tidied to 1h30 when you leave it.
+function parseHours(text) {
+  let t = (text || "").replace(/\s+/g, "").replace(/小时|時|H/g, "h").replace(/分钟|分|min/g, "m").replace(/：/g, ":");
+  const sign = (t.match(/[+-](?=[^+-]*$)/) || [""])[0]; t = t.replace(/[+-]/g, "");
+  let m;
+  if (t === "") return { min: 0, sign };
+  if ((m = t.match(/^(\d+)h(\d{1,2})m?$/)) && +m[2] < 60) return { min: +m[1] * 60 + +m[2], sign };
+  if ((m = t.match(/^(\d+):(\d{2})$/)) && +m[2] < 60) return { min: +m[1] * 60 + +m[2], sign };
+  if ((m = t.match(/^(\d*\.?\d+)h?$/))) return { min: Math.round(+m[1] * 60), sign };
+  if ((m = t.match(/^(\d+)m$/))) return { min: +m[1], sign };
+  return null;
+}
+function fmtHours(min, sign) { const h = Math.floor(min / 60), m = min % 60; return h + "h" + (m ? String(m).padStart(2, "0") : "") + (sign || ""); }
+function tidyHours(text) { const p = parseHours(text); return p && text.trim() ? fmtHours(p.min, p.sign) : text; }
 function hoursTotal() {
   let sum = 0, plus = false, minus = false;
-  S.hours.forEach(h => { const n = parseFloat(h.h); if (!isNaN(n)) sum += n; plus ||= /\+$/.test(h.h); minus ||= /-$/.test(h.h); });
-  return String(+sum.toFixed(2)) + "h" + (plus ? "+" : minus ? "-" : "");
+  S.hours.forEach(h => { const p = parseHours(h.h); if (!p) return; sum += p.min; plus ||= p.sign === "+"; minus ||= p.sign === "-"; });
+  return fmtHours(sum, plus ? "+" : minus ? "-" : "");
 }
 
 const prevF = k => (S.prev && S.prev.f && S.prev.f[k]) || "…";
@@ -389,16 +409,16 @@ function render() {
   refreshers = []; doc.innerHTML = "";
 
   // stored as "1.5+", shown as 1.5 h +, so the copy reads "1.5h+"
-  const sign = h => (h.h.match(/[+-]$/) || [""])[0];
   S.hours.forEach((h, i) => {
+    h.h = tidyHours(h.h);
     const p = S.prev && S.prev.hours && S.prev.hours[i];
-    line("@" + h.label + " ",
-      ed(() => h.h.replace(/[+-]$/, ""), v => { h.h = v.trim() + sign(h); }, (p && p.h.replace(/[+-]$/, "")) || "0",
-        { empty: "0", check: () => h.h === "" || !isNaN(parseFloat(h.h)) }),
-      "h",
-      ed(() => sign(h), v => { h.h = h.h.replace(/[+-]$/, "") + v.trim().slice(0, 1); }, "", { check: () => true }),
+    const box = ed(() => h.h, v => { h.h = v.trim(); }, (p && p.h && tidyHours(p.h)) || "0h",
+      { empty: "0h", check: () => parseHours(h.h) !== null });
+    box.title = "4h15 = 4小时15分；也可以打 1.5、1:30、90m，离开时自动变成 1h30；末尾可加 + 或 -";
+    box.addEventListener("blur", () => { const t = tidyHours(h.h); if (t !== h.h) { h.h = t; box.textContent = t; changed(); } });
+    line("@" + h.label + " ", box,
       ed(() => h.note, v => { h.note = v; }, p && p.note ? "（" + p.note + "）" : "（备注）",
-        { wrap: true, check: () => !(parseFloat(h.h) > 0) || h.note.trim() !== "" }));
+        { wrap: true, check: () => !((parseHours(h.h) || {}).min > 0) || h.note.trim() !== "" }));
   });
   line("@总计", calc(hoursTotal));
 
@@ -509,10 +529,11 @@ function parseJournal(raw) {
     if (/^(规则|备忘|●备忘)|^——/.test(t) || /^●\s*备忘/.test(t)) { if (/规则/.test(t)) break; sec = "skip"; continue; }
     if (/^-{5,}/.test(t)) continue;
     if (/^\d*\s*@/.test(t)) {
-      const m = t.replace(/^\d*\s*@\s*/, "").match(/^(\S+?)\s*([\d.]*)\s*h?\s*([+-]?)\s*h?\s*(?:[（(](.*)[）)])?$/);
-      const k = m && HOUR_LABELS.findIndex(l => m[1].startsWith(l));
-      if (m && m[1].startsWith("总计")) { read++; continue; }
-      if (m && k >= 0) { s.hours[k].h = m[2] + m[3]; s.hours[k].note = (m[4] || "").trim(); read++; } else missed.push(t);
+      const rest = t.replace(/^\d*\s*@\s*/, "");
+      if (rest.startsWith("总计")) { read++; continue; }
+      const k = HOUR_LABELS.findIndex(l => rest.startsWith(l));
+      const m = k >= 0 && rest.slice(HOUR_LABELS[k].length).match(/^\s*([^（(]*?)\s*(?:[（(](.*)[）)])?\s*$/);
+      if (m && parseHours(m[1])) { s.hours[k].h = tidyHours(m[1]); s.hours[k].note = (m[2] || "").trim(); read++; } else missed.push(t);
       continue;
     }
     if (/^▲\s*每日回顾/.test(t)) { sec = "daily"; read++; continue; }
@@ -606,6 +627,11 @@ document.getElementById("import").addEventListener("change", async e => {
   } catch (err) { toast("这个文件不是日志备份"); }
   e.target.value = "";
 });
+
+// the group's own example journal and rules, as written in the Word template
+const SAMPLE = "1@邮件回复 1h（MDC，TTT为主）\n@立项开发 1.5h（淘图0.5，整理集体图0.5，下样单0.5） \n@搜款推客0.5h (给HKM挑推30款0.5)\n@其他开发 1.5h+（找温州小凉鞋新工厂0.25,下样TRT 0.25，催样1+）\n@定单相关 1h-（MDC条码处理 0.5-， TTS货期沟通0.5）\n@单据 0.5h（TRT）\n@整样 0.5h（LFGW）\n@其他事务 0.75h (日志0.25，做卫生0.5)\n@总计7.25h+\n▲每日回顾：\n*组内日常清单表：1023当天接收4，当天完成3，未结2，传递：17：50已传\n*接单/出货系统更新：1023已接单未入系统：AAA/2款0.6W啥原因1029（仅前道业务）；已接单未交接后道：AAA/2款/客已下单2天（仅前道业务）；已出货未更新系统：AAA/2.5W 1029（仅后道业务）\n*在手需下样还未下样款数：1023款2：AAA款1，ABC款1，打算如何1029\n*客户投诉：1023/1条, 知会QC/QA：1条；阿文确认收到：1条，今入持续关注区登记客诉：1条\n▲提醒：本周第43周\n-W43周一传未完日常清单表，1020已传（或：1020无未完记录），下周1027\n▲持续关注(客户工厂投诉/欠包装/测试未过/进度核对/船期预警/品质难点/会议/其他等跟踪)：\n-1021客诉：某客投诉某事，已知会QC/QA，阿文已确认收到，1022如何如何1029\n+1023客诉：AAA如何如何，已知会QC/QA，阿文已确认收到1027\n+1023欠包装：AAA某厂1款，如何如何1030\n-1020测试未过：AAA某厂1款，如何如何1030\n-1017进度核对：ABC进度表发哪些QC，进度目前没有问题1024\n-1017进度核对：DDD进度表发哪些QC，进度目前没有问题1024\n-1020船期预警：ABC某某厂1W双客期1115交，1022做了啥，打算如何1029\n-1017品质：BBB某厂某材质，1021如何，1022如何1030\n+1020品质：某厂某材质如何，1023如何1028\n-0913会议：ABC某日来访，1020打算如何1029\n+1013会议：DDD10月23日15:00会议，1023如何如何X\n-1014某事如何，1022如何1029\n--------------------------------------------------------------------------------------\n●●每周回顾：以下统计值每周5更新：1017更新\n*本周工厂意见/投诉：1017投诉2，某厂投诉如何如何，某某厂投诉如何如何\n*本周搜款推客：1017/2客AAA/22款，BBB/50款，下周计划：1客CEC1024（仅前道业务）\n*本周来联系我们C2C3C4客/新客数：1017/2客，激活：1/某国DDD，新入系统：1/某国CENTE；系统更新自评：5（仅前道业务）\n*负责C1C2客户数：1017 C1日志4系统4, C2日志1系统1；与系统客户总表校对时点：1017/14:30完成（仅前道业务）\n*未结账务：1017如何如何\n*已投产欠包装：1017款1，持续关注区登记欠包装：1\n*测试未过：1017款1，持续关注区登记：1\n*进度核对/船期预警：1017进度核对2，船期预警1；持续关注区登记：进度核对2船期预警1\n*品质关注点：1017需关注点2，持续关注区登记品质：2\n*待开客户会议/来访：1017客1，持续关注区登记会议：1，系统客户来访待开会议数1；系统更新自评：5\n*本周入系统订单款数：1017款5，最久在手工作天数1天，入系统速度自评：5（）\n*系统在手设计稿-业务模块：1017已通过未下样数2，下样推进时效自评：4（如何如何）（仅有立项业务）\n*本周下样数：1017样3，最久在手工作天数1天，下样速度自评：5（）\n*未完试样单数：1017单3，无需试样备注描述合规自评：5\n*本周超30天样单数：1017：1单，上周2单；本周最久已下样119天；本周本人做了哪些推动工作/自评：1017如何如何/自评：4.5\n●C1有单老客：3客\nABC1前 鞋1 \n224单80532双；225单3000双，226单5000双，估105000双\n+1017啥事，1023做了啥，打算如何1028\n鞋2\n224单0双；225单8532双，估21300双\n-1010男段3款，1021如何，如何1030\n+1010女段2款，1023如何，如何1029\nABCM前后 鞋1 \n224单3000双；225单2000双，未出0双，226单3000双，估4000双\n-1017 如何如何，1021如何如何1030\nBBB后 鞋1\n225未出3000双\n+1023如何如何1029\n●C1无单老客/C1新客：1客\n-0430（英国FGD前）如何，0725寄样，0920如何如何1024\n●C2目标客：1客\n-0220（德国ADG）如何，0230如何，0630如何如何1110\n-----------------------------------------------------\n●备忘：\n*日常清单表：若有新的记录生成或有记录完成了，需当天传递；\n*日常清单表：若有未完成的记录，无论有无更新，每周一传递；\n\n————————————————————————————————————————\n规则：\n1)\t@开头9行为固化格式为当日工时分布登记及汇总。若有工时数值产生，需在（）内简注事类；若有多项事类，请注明每项时间。\n2）= 后面跟的日期都是每周回顾日期，事项末尾无需计划日期。\n3）# 为分类汇总符号，#后面日期为汇总统计日期，事项末尾无需计划日期。\n4) –后面跟的只有3种情况：A) 周缩写加周数，如“W11”，B)月缩写加月数，如“M12”，C）4位数值登记日期，该日期都是事项入日志那一天的日期，该事项未打x移除前，此开头日期都不改。\n5）–开头事项在事项末尾都需注明计划日期（该日期不是过去日期，也不是日志当天日期），直至事项末尾打X结束移除出日志为止。若不是刚入日志的事项，跟踪事项通常体现3个日期，除了开头和结尾各一个，中间还需一个登记最新操作的那个日期；-号开头的跟踪事项若当天有更新，需将-号改为+号；第二天若+号开头的记录若无继续更新，需将+号改为-号。\n6)\t持续关注区内与客诉/欠包装/测试未过/进度核对/船期预警/品质/会议相关记录都需在开头日期码后面加“类别：”标注，如：-1124客诉：某客如何如何1130\n7）若一个顶级客人下有多个不同简称客人，该客人所有简称都须用4位简称。\n8）已接单未入系统栏登记的订单都需是有具体数量的订单，无明确数量的订单预告不在此栏体现。\n9）界面整齐简洁，减少所有不必要的空格和空行。\n10) C1有单老客日志登记上一业务年度，当前业务年度和下一业务年度订单数值，若下一业务年度无订单数值，不用显示该业务年度信息。日志上的预估数量都是预估当前业务年度的未下单数量。每10月31日进入新的业务年度时，需将前前业务年度订单信息删除，如进入224业务年度，需将222业务年度订单信息删除。\n11）C1有单老客区：所有客户都需从“前/前后/后”这3个选项中选一个标注在客户简称后面，标前或前后的客户需做数量预估；带后的客户需统计本年度未出数量。\n12）C1无单老客/C1新客区：所有客户都需从“前/前后/后”这3个选项中选一个标注在客户简称后面。\n13）C1无单老客指以前下过订单，但当前业务年度和上一业务年度无订单的客人；C1无单老客或C1新客一旦下单，该客户记录就需移到C1有单老客区。\n14）C1有单老客区，前道业务负责每个客人每个产品线名下需至少有一条跟踪记录来登记与该客人该产品线的互动进展及计划情况。";
+document.getElementById("sample").addEventListener("click", () => { document.getElementById("sampleText").value = SAMPLE; document.getElementById("sampleDlg").showModal(); });
+document.getElementById("sampleClose").addEventListener("click", () => document.getElementById("sampleDlg").close());
 
 let toastTimer;
 function toast(t) { const n = document.getElementById("toast"); n.textContent = t; n.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(() => n.classList.remove("show"), 2600); }

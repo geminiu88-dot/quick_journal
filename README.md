@@ -10,6 +10,10 @@ worked out, red means "check this". 「复制日志」 copies the text exactly a
   (「从备份恢复」 puts it back). Keep the file in one fixed place.
 - **One file, no libraries,** works offline: double-click `index.html`
   (Chrome or Edge).
+- **Hours** are written the group leader's way: `4h15` = 4 h 15 min (no unit
+  on the minutes), `+`/`-` at the end. Typing `1.5`, `1:30`, `90m` or `1h30` all
+  work; the box is tidied to `1h30` when you leave it (`parseHours` /
+  `fmtHours`). 「格式范本」 shows the group's example journal and rules.
 - **Automatic:** date codes (MMDD), hours total, ISO week no., `+`/`-`
   (`+` = item changed today), plan dates checked (must be after today), items
   ended with `X` disappear the next day, 登记 counts per category, client counts.
