@@ -1,0 +1,603 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>日志 BC组</title>
+<style>
+  :root {
+    --bg: #f3f1ec; --paper: #ffffff; --ink: #1d1d1b; --muted: #8a877f;
+    --edit: #fff6c8; --edit-line: #e2c94a; --calc: #e6f0fb; --bad: #ffd7d2; --bad-line: #d2433a;
+    --ui: #2f6fb3; --border: #d9d5cc;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1b1b1a; --paper: #262624; --ink: #ecebe6; --muted: #9a978f;
+      --edit: #4a4320; --edit-line: #a8902c; --calc: #233447; --bad: #5a2622; --bad-line: #ff8379;
+      --ui: #8ab8ea; --border: #44423d;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1b1b1a; --paper: #262624; --ink: #ecebe6; --muted: #9a978f;
+    --edit: #4a4320; --edit-line: #a8902c; --calc: #233447; --bad: #5a2622; --bad-line: #ff8379;
+    --ui: #8ab8ea; --border: #44423d;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.75 "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif; }
+  .bar { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    padding: 8px 16px; background: var(--paper); border-bottom: 1px solid var(--border); }
+  .bar b { margin-right: 8px; }
+  .bar button, .bar label.btn { font: inherit; font-size: 14px; padding: 3px 12px; border: 1px solid var(--border);
+    border-radius: 6px; background: var(--paper); color: var(--ink); cursor: pointer; }
+  .bar button.main { background: var(--ui); border-color: var(--ui); color: #fff; }
+  .bar button.hot { background: var(--edit); border-color: var(--edit-line); }
+  .bar input[type=date] { font: inherit; font-size: 14px; padding: 2px 6px; border: 1px solid var(--border);
+    border-radius: 6px; background: var(--paper); color: var(--ink); }
+  .bar .msg { color: var(--muted); font-size: 13px; }
+  .bar .msg.bad { color: var(--bad-line); }
+  .legend { font-size: 13px; color: var(--muted); }
+  .legend span { padding: 0 6px; border-radius: 3px; }
+  main { max-width: 1100px; margin: 16px auto; padding: 0 16px; }
+  .doc { background: var(--paper); border: 1px solid var(--border); border-radius: 4px; padding: 24px 32px; }
+  .line { min-height: 1.75em; white-space: pre-wrap; word-break: break-all; position: relative; }
+  .line:hover > .ui { visibility: visible; }
+  [contenteditable] { background: var(--edit); border-bottom: 1px dashed var(--edit-line); outline: none;
+    padding: 0 2px; border-radius: 2px; min-width: 1.5em; display: inline-block; }
+  [contenteditable]:focus { box-shadow: 0 0 0 2px var(--edit-line); }
+  [contenteditable]:empty::before { content: attr(data-ph); color: var(--muted); }
+  .wrap:not(:empty)::before { content: "（"; }
+  .wrap:not(:empty)::after { content: "）"; }
+  .calc { background: var(--calc); border-radius: 2px; padding: 0 1px; }
+  .bad { background: var(--bad) !important; border-bottom-color: var(--bad-line) !important; }
+  select { font: inherit; color: var(--ink); background: var(--edit); border: 0; border-bottom: 1px dashed var(--edit-line);
+    padding: 0; appearance: none; -webkit-appearance: none; cursor: pointer; }
+  select.none { color: var(--muted); font-size: 12px; background: none; }
+  .ui { visibility: hidden; font-size: 12px; margin-left: 8px; color: var(--ui); cursor: pointer; user-select: none; }
+  .ui:hover { text-decoration: underline; }
+  .add { display: block; visibility: visible; font-size: 13px; margin: 0 0 2px 0; color: var(--ui); opacity: .7; }
+  .add:hover { opacity: 1; }
+  .closed { color: var(--muted); text-decoration: line-through; }
+  details { margin-top: 16px; background: var(--paper); border: 1px solid var(--border); border-radius: 4px; padding: 8px 16px; }
+  details pre { white-space: pre-wrap; font: inherit; font-size: 14px; margin: 8px 0; }
+  dialog { width: min(900px, 92vw); border: 1px solid var(--border); border-radius: 6px; background: var(--paper); color: var(--ink); }
+  dialog textarea { width: 100%; height: 50vh; font: inherit; font-size: 14px; background: var(--bg); color: var(--ink); }
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--paper);
+    padding: 8px 18px; border-radius: 6px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .toast.show { opacity: .92; }
+  @media print { .bar, .ui, .add, details { display: none !important; } [contenteditable], .calc, select { background: none; border: 0; } }
+</style>
+</head>
+<body>
+<div class="bar">
+  <b>日志 · BC组</b>
+  日期 <input type="date" id="day">
+  <button class="main" id="copy">复制日志</button>
+  <button id="week" title="把每周回顾的日期和统计数字更新到今天">周五更新统计</button>
+  <button id="hist">以前的日志</button>
+  <button id="imp">导入现有日志</button>
+  <button id="export">备份到文件</button>
+  <label class="btn">从备份恢复<input type="file" id="import" accept=".json" hidden></label>
+  <span class="msg" id="msg"></span>
+  <span class="legend"><span style="background:var(--edit)">黄色 = 填写</span> <span style="background:var(--calc)">蓝色 = 自动</span> <span style="background:var(--bad)">红色 = 要检查</span></span>
+</div>
+<main>
+  <div class="doc" id="doc"></div>
+  <details>
+    <summary>日志规则（参考，不复制进日志）</summary>
+    <pre id="rules"></pre>
+    <p class="legend">自动做的：日期码、工时总计、本周第几周、+/- 号（今天改过的事项是 +，其他是 -）、计划日期检查（不能是今天或过去）、
+      计划日期写 X 的事项第二天自动删除、各类登记数、客户数、每周回顾的日期和统计（按“周五更新统计”时记下）。</p>
+  </details>
+</main>
+<dialog id="histDlg">
+  <p><select id="histSel"></select> <button id="histClose">关闭</button></p>
+  <textarea id="histText" readonly></textarea>
+</dialog>
+<dialog id="impDlg">
+  <p>把现有的日志文字整篇粘贴进来（规则部分可以不要），按“检查”。</p>
+  <textarea id="impText"></textarea>
+  <p><button id="impCheck">检查</button> <button id="impDo" disabled>导入</button> <button id="impClose">关闭</button></p>
+  <pre id="impResult" style="white-space:pre-wrap"></pre>
+</dialog>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+// Everything the journal remembers is kept in this browser (localStorage), on this PC only.
+const KEY = "journal-bc-v1";
+const CATS = ["", "客诉", "欠包装", "测试未过", "进度核对", "船期预警", "品质", "会议"];
+const HOUR_LABELS = ["邮件回复", "立项开发", "搜款推客", "其他开发", "定单相关", "单据", "整样", "其他事务"];
+
+// ---------- dates ----------
+function iso(d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+function fromIso(s) { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); }
+function mmdd(d) { return String(d.getMonth() + 1).padStart(2, "0") + String(d.getDate()).padStart(2, "0"); }
+function isoWeek(d) {
+  const t = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  t.setDate(t.getDate() + 3 - (t.getDay() + 6) % 7);
+  const w1 = new Date(t.getFullYear(), 0, 4);
+  return 1 + Math.round(((t - w1) / 864e5 - 3 + (w1.getDay() + 6) % 7) / 7);
+}
+function monday(d) { const t = new Date(d); t.setDate(t.getDate() - (t.getDay() + 6) % 7); return t; }
+function lastFriday(d) { const t = new Date(d); t.setDate(t.getDate() - (t.getDay() + 2) % 7); return t; }
+// a 4-digit MMDD near the journal day -> Date (picks the year so it is within half a year)
+function mmddToDate(s, ref) {
+  if (!/^\d{4}$/.test(s)) return null;
+  const m = +s.slice(0, 2), d = +s.slice(2);
+  if (m < 1 || m > 12 || d < 1 || d > 31) return null;
+  let t = new Date(ref.getFullYear(), m - 1, d);
+  if (t - ref > 182 * 864e5) t = new Date(ref.getFullYear() - 1, m - 1, d);
+  if (ref - t > 182 * 864e5) t = new Date(ref.getFullYear() + 1, m - 1, d);
+  return t;
+}
+
+let DAY = new Date(); DAY = new Date(DAY.getFullYear(), DAY.getMonth(), DAY.getDate());
+const today = () => iso(DAY);
+const T = () => mmdd(DAY);
+
+// ---------- the fixed lines: text, {d} = journal date, {w} = weekly date, {f: box}, {c: automatic} ----------
+const DAILY = [
+  ["*组内日常清单表：", { d: 1 }, { f: "d1" }],
+  ["*接单/出货系统更新：", { d: 1 }, { f: "d2" }],
+  ["*在手需下样还未下样款数：", { d: 1 }, { f: "d3" }],
+  ["*客户投诉：", { d: 1 }, { f: "d4" }, "，今入持续关注区登记客诉：", { c: "newComplaints" }, "条"],
+];
+const WEEKLY = [
+  ["*本周工厂意见/投诉：", { w: 1 }, { f: "w1" }],
+  ["*本周搜款推客：", { w: 1 }, { f: "w2" }],
+  ["*本周来联系我们C2C3C4客/新客数：", { w: 1 }, { f: "w3" }],
+  ["*负责C1C2客户数：", { w: 1 }, " C1日志", { c: "c1" }, "系统", { f: "w4a" }, ", C2日志", { c: "c2" }, "系统", { f: "w4b" }, { f: "w4c" }],
+  ["*未结账务：", { w: 1 }, { f: "w5" }],
+  ["*已投产欠包装：", { w: 1 }, { f: "w6" }, "，持续关注区登记欠包装：", { c: "欠包装" }],
+  ["*测试未过：", { w: 1 }, { f: "w7" }, "，持续关注区登记：", { c: "测试未过" }],
+  ["*进度核对/船期预警：", { w: 1 }, "进度核对", { f: "w8a" }, "，船期预警", { f: "w8b" }, "；持续关注区登记：进度核对", { c: "进度核对" }, "船期预警", { c: "船期预警" }],
+  ["*品质关注点：", { w: 1 }, { f: "w9" }, "，持续关注区登记品质：", { c: "品质" }],
+  ["*待开客户会议/来访：", { w: 1 }, { f: "w10a" }, "，持续关注区登记会议：", { c: "会议" }, { f: "w10b" }],
+  ["*本周入系统订单款数：", { w: 1 }, { f: "w11" }],
+  ["*系统在手设计稿-业务模块：", { w: 1 }, { f: "w12" }],
+  ["*本周下样数：", { w: 1 }, { f: "w13" }],
+  ["*未完试样单数：", { w: 1 }, { f: "w14" }],
+  ["*本周超30天样单数：", { w: 1 }, { f: "w15a" }, { w: 1 }, { f: "w15b" }],
+];
+const fieldsOf = lines => lines.flat().filter(p => p.f).map(p => p.f);
+
+// ---------- storage ----------
+function load() {
+  try { const s = localStorage.getItem(KEY); if (s) return JSON.parse(s); } catch (e) {}
+  return null;
+}
+function save() {
+  if (S.weekDate === today()) S.weekSnap = counts();   // weekly numbers follow the page on the update day, then stay
+  if (doc.childNodes.length) S.archive[today()] = journalText();
+  const days = Object.keys(S.archive).sort(); days.slice(0, -60).forEach(d => delete S.archive[d]);
+  try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { msg("保存失败：浏览器不让存数据", true); }
+}
+
+// ---------- a new day ----------
+// Runs the first time the page is opened on a later day than the last entry. Days not opened don't exist.
+// Yesterday's typed values stay visible in grey inside the empty boxes.
+function newDay() {
+  if (S.lastDay && today() <= S.lastDay) return;
+  const last = S.lastDay ? fromIso(S.lastDay) : null;
+  // keep the last value that was actually typed (a box left empty keeps the older grey hint)
+  const old = S.prev || { f: {}, hours: [] };
+  S.prev = { f: { ...old.f }, hours: S.hours.map((h, i) => (h.h || h.note) ? { ...h } : (old.hours[i] || { ...h })) };
+  Object.keys(S.f).forEach(k => { if (S.f[k]) S.prev.f[k] = S.f[k]; });
+  S.hours.forEach(h => { h.h = ""; h.note = ""; });
+  fieldsOf(DAILY).forEach(k => { S.f[k] = ""; });
+  if (DAY.getDay() === 5) {                                  // Friday: weekly review starts empty, dated today
+    fieldsOf(WEEKLY).forEach(k => { S.f[k] = ""; });
+    S.weekDate = today();
+  }
+  if (last && iso(monday(DAY)) !== iso(monday(last))) {      // first entry of a new week: W-items get the new week no.
+    const next = new Date(monday(DAY)); next.setDate(next.getDate() + 7);
+    S.remind.forEach(x => { if (/^W\d+$/.test(x.start)) { x.start = "W" + isoWeek(DAY); x.plan = mmdd(next); } });
+  }
+  S.lastDay = today();
+}
+
+// ---------- starting content (the template's example) ----------
+function it(start, cat, text, plan, plus) { return { start, cat, text, plan, edited: plus ? today() : "", closed: "" }; }
+function blank() {
+  return { hours: HOUR_LABELS.map(label => ({ label, h: "", note: "" })), f: {}, weekDate: iso(lastFriday(DAY)), weekSnap: null,
+    remind: [], focus: [], clients: [], c1none: [], c2: [], archive: {}, prev: null, lastDay: today() };
+}
+function seed() {
+  const s = blank();
+  [["1", "MDC，TTT为主"], ["1.5", "淘图0.5，整理集体图0.5，下样单0.5"], ["0.5", "给HKM挑推30款0.5"],
+   ["1.5+", "找温州小凉鞋新工厂0.25，下样TRT 0.25，催样1+"], ["1-", "MDC条码处理 0.5-，TTS货期沟通0.5"],
+   ["0.5", "TRT"], ["0.5", "LFGW"], ["0.75", "日志0.25，做卫生0.5"]].forEach(([h, note], i) => Object.assign(s.hours[i], { h, note }));
+  s.f = {
+    d1: "当天接收4，当天完成3，未结2，传递：17：50已传",
+    d2: "已接单未入系统：AAA/2款0.6W啥原因1029（仅前道业务）；已接单未交接后道：AAA/2款/客已下单2天（仅前道业务）；已出货未更新系统：AAA/2.5W 1029（仅后道业务）",
+    d3: "款2：AAA款1，ABC款1，打算如何1029",
+    d4: "/1条, 知会QC/QA：1条；阿文确认收到：1条",
+    w1: "投诉2，某厂投诉如何如何，某某厂投诉如何如何",
+    w2: "/2客AAA/22款，BBB/50款，下周计划：1客CEC1024（仅前道业务）",
+    w3: "/2客，激活：1/某国DDD，新入系统：1/某国CENTE；系统更新自评：5（仅前道业务）",
+    w4a: "4", w4b: "1", w4c: "；与系统客户总表校对时点：1017/14:30完成（仅前道业务）",
+    w5: "如何如何", w6: "款1", w7: "款1", w8a: "2", w8b: "1", w9: "需关注点2",
+    w10a: "客1", w10b: "，系统客户来访待开会议数1；系统更新自评：5",
+    w11: "款5，最久在手工作天数1天，入系统速度自评：5（）",
+    w12: "已通过未下样数2，下样推进时效自评：4（如何如何）（仅有立项业务）",
+    w13: "样3，最久在手工作天数1天，下样速度自评：5（）",
+    w14: "单3，无需试样备注描述合规自评：5",
+    w15a: "：1单，上周2单；本周最久已下样119天；本周本人做了哪些推动工作/自评：", w15b: "如何如何/自评：4.5",
+  };
+  s.remind = [it("W" + isoWeek(DAY), "", "周一传未完日常清单表，1020已传（或：1020无未完记录），下周", "1027", false)];
+  s.focus = [
+    it("1021", "客诉", "某客投诉某事，已知会QC/QA，阿文已确认收到，1022如何如何", "1029", false),
+    it(T(), "客诉", "AAA如何如何，已知会QC/QA，阿文已确认收到", "1027", true),
+    it(T(), "欠包装", "AAA某厂1款，如何如何", "1030", true),
+    it("1020", "测试未过", "AAA某厂1款，如何如何", "1030", false),
+    it("1017", "进度核对", "ABC进度表发哪些QC，进度目前没有问题", "1024", false),
+    it("1017", "进度核对", "DDD进度表发哪些QC，进度目前没有问题", "1024", false),
+    it("1020", "船期预警", "ABC某某厂1W双客期1115交，1022做了啥，打算如何", "1029", false),
+    it("1017", "品质", "BBB某厂某材质，1021如何，1022如何", "1030", false),
+    it("1020", "品质", "某厂某材质如何，1023如何", "1028", true),
+    it("0913", "会议", "ABC某日来访，1020打算如何", "1029", false),
+    it("1013", "会议", "DDD10月23日15:00会议，1023如何如何", "X", true),
+    it("1014", "", "某事如何，1022如何", "1029", false),
+  ];
+  s.focus[10].closed = today();
+  s.clients = [
+    { name: "ABC1", role: "前", lines: [
+      { product: "鞋1", qty: "224单80532双；225单3000双，226单5000双，估105000双", items: [it("1017", "", "啥事，1023做了啥，打算如何", "1028", true)] },
+      { product: "鞋2", qty: "224单0双；225单8532双，估21300双",
+        items: [it("1010", "", "男段3款，1021如何，如何", "1030", false), it("1010", "", "女段2款，1023如何，如何", "1029", true)] } ] },
+    { name: "ABCM", role: "前后", lines: [
+      { product: "鞋1", qty: "224单3000双；225单2000双，未出0双，226单3000双，估4000双", items: [it("1017", "", "如何如何，1021如何如何", "1030", false)] } ] },
+    { name: "BBB", role: "后", lines: [{ product: "鞋1", qty: "225未出3000双", items: [it("1023", "", "如何如何", "1029", true)] }] },
+  ];
+  s.c1none = [it("0430", "", "（英国FGD前）如何，0725寄样，0920如何如何", "1024", false)];
+  s.c2 = [it("0220", "", "（德国ADG）如何，0230如何，0630如何如何", "1110", false)];
+  return s;
+}
+
+let S = load() || seed();
+
+// ---------- counts ----------
+function alive(x) { return !x.closed || x.closed >= today(); }      // X items stay visible on the day they are closed
+function openFocus(cat) { return S.focus.filter(x => x.cat === cat && x.plan !== "X" && alive(x)).length; }
+function counts() {
+  const c = { c1: S.clients.length + S.c1none.filter(alive).length, c2: S.c2.filter(alive).length };
+  CATS.slice(2).forEach(k => { c[k] = openFocus(k); });
+  return c;
+}
+function calcValue(k) {
+  if (k === "newComplaints") return S.focus.filter(x => x.cat === "客诉" && x.start === T()).length;
+  const live = S.weekDate === today() || !S.weekSnap;
+  return (live ? counts() : S.weekSnap)[k];
+}
+
+// ---------- building the page ----------
+let refreshers = [];
+const doc = document.getElementById("doc");
+
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+function line(...parts) { const d = el("div", "line"); parts.forEach(p => d.append(typeof p === "string" ? document.createTextNode(p) : p)); doc.append(d); return d; }
+
+// editable box: get/set read and write the stored value
+function ed(get, set, ph, opts = {}) {
+  const s = el("span", opts.wrap ? "wrap" : "");
+  s.contentEditable = "plaintext-only";
+  if (s.contentEditable !== "plaintext-only") s.contentEditable = "true";
+  s.textContent = get(); s.dataset.ph = ph ?? "…";
+  if (opts.empty) s.dataset.empty = opts.empty;
+  s.addEventListener("input", () => { set(s.textContent); changed(); });
+  s.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); s.blur(); } });
+  s.addEventListener("paste", e => { e.preventDefault(); document.execCommand("insertText", false, (e.clipboardData.getData("text") || "").replace(/\s*\n\s*/g, "")); });
+  if (opts.check) refreshers.push(() => s.classList.toggle("bad", !opts.check()));
+  return s;
+}
+function calc(fn) { const s = el("span", "calc"); const r = () => { s.textContent = fn(); }; r(); refreshers.push(r); return s; }
+function ui(text, fn, title) { const s = el("span", "ui", text); if (title) s.title = title; s.addEventListener("click", fn); return s; }
+function addLink(text, fn) { const d = el("div", "add ui", "＋ " + text); d.addEventListener("click", fn); doc.append(d); }
+
+function planOk(x) {
+  if (x.plan === "X") return true;
+  const p = mmddToDate(x.plan, DAY); return !!p && p > DAY;
+}
+
+function itemLine(list, x, withCat) {
+  const touch = () => { x.edited = today(); };
+  const sign = calc(() => x.edited === today() ? "+" : "-");
+  const parts = [sign, ed(() => x.start, v => { x.start = v.trim(); touch(); }, "日期")];
+  if (withCat) {
+    const sel = el("select");
+    CATS.forEach(c => { const o = el("option", "", c ? c + "：" : "＋类别"); o.value = c; sel.append(o); });
+    sel.value = x.cat; sel.dataset.out = "cat"; fitSelect(sel);
+    sel.addEventListener("change", () => { x.cat = sel.value; fitSelect(sel); touch(); changed(); });
+    parts.push(sel);
+  }
+  const text = ed(() => x.text, v => { x.text = v; touch(); }, "事项");
+  parts.push(text);
+  const plan = ed(() => x.plan, v => {
+    x.plan = v.trim().toUpperCase() === "X" ? "X" : v.trim();
+    x.closed = x.plan === "X" ? today() : ""; touch();
+  }, "计划", { check: () => planOk(x) });
+  plan.title = "计划日期 MMDD（要晚于今天）；写 X = 结束，第二天自动删除";
+  parts.push(plan);
+  const L = line(...parts);
+  L.append(ui("今日更新", () => {
+    if (!x.text.includes(T())) { x.text = x.text.replace(/[，,]$/, "") + "，" + T(); text.textContent = x.text; }
+    touch(); changed(); text.focus(); placeEnd(text);
+  }, "在事项后面加上今天的日期，再写今天做了什么"));
+  L.append(ui("删除", () => { if (confirm("删除这一条？")) { list.splice(list.indexOf(x), 1); render(); save(); } }));
+  refreshers.push(() => L.classList.toggle("closed", x.plan === "X"));
+}
+function items(list, withCat) {
+  list.filter(alive).forEach(x => itemLine(list, x, withCat));
+  addLink("事项", () => { list.push(it(T(), "", "", "", true)); render(); save(); });
+}
+// a select as wide as its chosen text, so it reads like the copied line ("＋类别" = no category, not copied)
+function fitSelect(sel) { sel.style.width = sel.options[sel.selectedIndex].text.length + 0.2 + "em"; sel.classList.toggle("none", sel.value === ""); }
+function placeEnd(n) { const r = document.createRange(); r.selectNodeContents(n); r.collapse(false); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
+
+function hoursTotal() {
+  let sum = 0, plus = false, minus = false;
+  S.hours.forEach(h => { const n = parseFloat(h.h); if (!isNaN(n)) sum += n; plus ||= /\+$/.test(h.h); minus ||= /-$/.test(h.h); });
+  return String(+sum.toFixed(2)) + "h" + (plus ? "+" : minus ? "-" : "");
+}
+
+const prevF = k => (S.prev && S.prev.f && S.prev.f[k]) || "…";
+function specLine(spec) {
+  return line(...spec.map(p => {
+    if (typeof p === "string") return p;
+    if (p.d) return calc(() => T());
+    if (p.w) return calc(() => mmdd(fromIso(S.weekDate)));
+    if (p.c) return calc(() => calcValue(p.c));
+    return ed(() => S.f[p.f] || "", v => { S.f[p.f] = v; }, prevF(p.f), { check: () => (S.f[p.f] || "").trim() !== "" });
+  }));
+}
+
+function render() {
+  newDay();
+  // drop items closed with X before today (rule 5)
+  ["remind", "focus", "c1none", "c2"].forEach(k => { S[k] = S[k].filter(alive); });
+  S.clients.forEach(c => c.lines.forEach(l => { l.items = l.items.filter(alive); }));
+  refreshers = []; doc.innerHTML = "";
+
+  // stored as "1.5+", shown as 1.5 h +, so the copy reads "1.5h+"
+  const sign = h => (h.h.match(/[+-]$/) || [""])[0];
+  S.hours.forEach((h, i) => {
+    const p = S.prev && S.prev.hours && S.prev.hours[i];
+    line("@" + h.label + " ",
+      ed(() => h.h.replace(/[+-]$/, ""), v => { h.h = v.trim() + sign(h); }, (p && p.h.replace(/[+-]$/, "")) || "0",
+        { empty: "0", check: () => h.h === "" || !isNaN(parseFloat(h.h)) }),
+      "h",
+      ed(() => sign(h), v => { h.h = h.h.replace(/[+-]$/, "") + v.trim().slice(0, 1); }, "", { check: () => true }),
+      ed(() => h.note, v => { h.note = v; }, p && p.note ? "（" + p.note + "）" : "（备注）",
+        { wrap: true, check: () => !(parseFloat(h.h) > 0) || h.note.trim() !== "" }));
+  });
+  line("@总计", calc(hoursTotal));
+
+  line("▲每日回顾：");
+  DAILY.forEach(specLine);
+  line("▲提醒：本周第", calc(() => isoWeek(DAY)), "周");
+  items(S.remind, false);
+  line("▲持续关注(客户工厂投诉/欠包装/测试未过/进度核对/船期预警/品质难点/会议/其他等跟踪)：");
+  items(S.focus, true);
+  line("--------------------------------------------------------------------------------------");
+
+  line("●●每周回顾：以下统计值每周5更新：", calc(() => mmdd(fromIso(S.weekDate))), "更新");
+  WEEKLY.forEach(specLine);
+
+  line("●C1有单老客：", calc(() => S.clients.length), "客");
+  S.clients.forEach(c => {
+    c.lines.forEach((l, i) => {
+      const head = [];
+      if (i === 0) {
+        const role = el("select"); ["前", "前后", "后"].forEach(r => { const o = el("option", "", r); o.value = r; role.append(o); });
+        role.value = c.role; fitSelect(role); role.addEventListener("change", () => { c.role = role.value; fitSelect(role); changed(); });
+        head.push(ed(() => c.name, v => { c.name = v.trim(); }, "客户简称"), role, " ");
+      }
+      const L = line(...head, ed(() => l.product, v => { l.product = v.trim(); }, "产品线"));
+      if (i === 0) {
+        L.append(ui("加产品线", () => { c.lines.push({ product: "", qty: "", items: [] }); render(); save(); }));
+        L.append(ui("删除客户", () => { if (confirm("删除客户 " + c.name + "？")) { S.clients.splice(S.clients.indexOf(c), 1); render(); save(); } }));
+      } else {
+        L.append(ui("删除产品线", () => { if (confirm("删除这条产品线？")) { c.lines.splice(i, 1); render(); save(); } }));
+      }
+      line(ed(() => l.qty, v => { l.qty = v; }, "各业务年度数量"));
+      items(l.items, false);
+    });
+  });
+  addLink("客户", () => { S.clients.push({ name: "", role: "前", lines: [{ product: "", qty: "", items: [] }] }); render(); save(); });
+
+  line("●C1无单老客/C1新客：", calc(() => S.c1none.filter(alive).length), "客");
+  items(S.c1none, false);
+  line("●C2目标客：", calc(() => S.c2.filter(alive).length), "客");
+  items(S.c2, false);
+  line("-----------------------------------------------------");
+  line("●备忘：");
+  line("*日常清单表：若有新的记录生成或有记录完成了，需当天传递；");
+  line("*日常清单表：若有未完成的记录，无论有无更新，每周一传递；");
+
+  refresh();
+  save();
+}
+
+function refresh() { refreshers.forEach(r => r()); }
+let saveTimer;
+function changed() { refresh(); clearTimeout(saveTimer); saveTimer = setTimeout(save, 300); }
+
+// ---------- the text that gets copied = exactly what is on the page ----------
+function textOf(node) {
+  let out = "";
+  node.childNodes.forEach(n => {
+    if (n.nodeType === 3) { out += n.textContent; return; }
+    if (n.classList.contains("ui")) return;
+    if (n.tagName === "SELECT") { out += n.dataset.out === "cat" ? (n.value ? n.value + "：" : "") : n.value; return; }
+    let t = n.textContent;
+    if (t === "" && n.dataset.empty) t = n.dataset.empty;
+    if (n.classList.contains("wrap") && t !== "") t = "（" + t + "）";
+    out += t;
+  });
+  return out;
+}
+function journalText() {
+  return [...doc.querySelectorAll(".line")].map(textOf).join("\r\n");
+}
+
+async function copyText(t) {
+  try { await navigator.clipboard.writeText(t); return true; } catch (e) {}
+  const ta = el("textarea"); ta.value = t; document.body.append(ta); ta.select();
+  const ok = document.execCommand("copy"); ta.remove(); return ok;
+}
+
+// ---------- reading an existing journal (pasted text) ----------
+// Tolerant: spaces, half/full-width punctuation and a missing category don't matter.
+// Lines it can't place are listed, nothing is guessed.
+const PUNCT = { "：": ":", "，": ",", "；": ";", "（": "(", "）": ")", "／": "/" };
+function litRe(s) {
+  return [...s.replace(/\s+/g, "")].map(ch => {
+    const alt = PUNCT[ch] || Object.keys(PUNCT).find(k => PUNCT[k] === ch);
+    return alt ? "[" + ch + alt + "]" : ch.replace(/[.*+?^${}()|[\]\\\/-]/g, "\\$&");
+  }).join("\\s*");
+}
+function specRe(spec) {
+  return new RegExp("^" + spec.map(p => typeof p === "string" ? litRe(p) : p.f ? "(.*?)" : p.c ? "\\s*\\d*\\s*" : "\\s*\\d{4}\\s*").join("") + "\\s*$");
+}
+function parseItem(t, withCat) {
+  const m = t.match(/^[+\-－–—]\s*(W\d+|M\d+|\d{4})?\s*(.*?)\s*(\d{4}|[Xx])?\s*$/);
+  if (!m) return null;
+  let cat = "", text = m[2];
+  if (withCat) {
+    const c = text.match(new RegExp("^(" + CATS.slice(1).join("|") + ")\\s*[：:]\\s*"));
+    if (c) { cat = c[1]; text = text.slice(c[0].length); }
+  }
+  const plan = (m[3] || "").toUpperCase();
+  return { start: m[1] || "", cat, text, plan, edited: "", closed: plan === "X" ? today() : "" };
+}
+function parseJournal(raw) {
+  const s = blank(), missed = [];
+  let sec = "", client = null, pl = null, read = 0;
+  const lines = raw.split(/\r?\n/).map(l => l.replace(/\s+$/, "")).filter(l => l.trim());
+  for (let t of lines) {
+    t = t.trim();
+    if (/^(规则|备忘|●备忘)|^——/.test(t) || /^●\s*备忘/.test(t)) { if (/规则/.test(t)) break; sec = "skip"; continue; }
+    if (/^-{5,}/.test(t)) continue;
+    if (/^\d*\s*@/.test(t)) {
+      const m = t.replace(/^\d*\s*@\s*/, "").match(/^(\S+?)\s*([\d.]*)\s*h?\s*([+-]?)\s*h?\s*(?:[（(](.*)[）)])?$/);
+      const k = m && HOUR_LABELS.findIndex(l => m[1].startsWith(l));
+      if (m && m[1].startsWith("总计")) { read++; continue; }
+      if (m && k >= 0) { s.hours[k].h = m[2] + m[3]; s.hours[k].note = (m[4] || "").trim(); read++; } else missed.push(t);
+      continue;
+    }
+    if (/^▲\s*每日回顾/.test(t)) { sec = "daily"; read++; continue; }
+    if (/^▲\s*提醒/.test(t)) { sec = "remind"; read++; continue; }
+    if (/^▲\s*持续关注/.test(t)) { sec = "focus"; read++; continue; }
+    if (/^●●\s*每周回顾/.test(t)) {
+      sec = "weekly"; read++;
+      const m = t.match(/(\d{4})\s*更新/); const d = m && mmddToDate(m[1], DAY); if (d) s.weekDate = iso(d);
+      continue;
+    }
+    if (/^●\s*C1\s*有单老客/.test(t)) { sec = "clients"; read++; continue; }
+    if (/^●\s*C1\s*无单老客/.test(t)) { sec = "c1none"; read++; continue; }
+    if (/^●\s*C2\s*目标客/.test(t)) { sec = "c2"; read++; continue; }
+    if (sec === "skip") continue;
+    if (sec === "daily" || sec === "weekly") {
+      const spec = (sec === "daily" ? DAILY : WEEKLY).find(sp => specRe(sp).test(t));
+      if (!spec) { missed.push(t); continue; }
+      const vals = t.match(specRe(spec)).slice(1);
+      spec.filter(p => p.f).forEach((p, i) => { s.f[p.f] = vals[i].trim(); });
+      read++; continue;
+    }
+    if (/^[+\-－–—]/.test(t)) {
+      const x = parseItem(t, sec === "focus");
+      const list = sec === "remind" ? s.remind : sec === "focus" ? s.focus : sec === "c1none" ? s.c1none : sec === "c2" ? s.c2 : pl && pl.items;
+      if (x && list) { list.push(x); read++; } else missed.push(t);
+      continue;
+    }
+    if (sec === "clients") {
+      const h = t.match(/^([A-Za-z0-9]+)\s*(前后|前|后)\s*(.*)$/);
+      if (h) { client = { name: h[1], role: h[2], lines: [] }; s.clients.push(client); pl = { product: h[3], qty: "", items: [] }; client.lines.push(pl); read++; continue; }
+      if (client && pl && !pl.qty && !pl.items.length) { pl.qty = t; read++; continue; }
+      if (client) { pl = { product: t, qty: "", items: [] }; client.lines.push(pl); read++; continue; }
+    }
+    missed.push(t);
+  }
+  return { s, missed, read };
+}
+
+// ---------- toolbar ----------
+const dayInput = document.getElementById("day");
+dayInput.value = today();
+dayInput.addEventListener("change", () => { if (!dayInput.value) return; DAY = fromIso(dayInput.value); render(); });
+
+document.getElementById("copy").addEventListener("click", async () => {
+  save();
+  const bad = doc.querySelectorAll(".bad").length;
+  const ok = await copyText(journalText());
+  toast(ok ? (bad ? "已复制。注意：有 " + bad + " 处红色要检查" : "已复制，可以粘贴了") : "复制失败，请用 以前的日志 里的文字");
+});
+
+document.getElementById("week").addEventListener("click", () => {
+  S.weekDate = today(); render(); toast("每周回顾的日期和统计已更新到 " + T());
+});
+
+const histDlg = document.getElementById("histDlg"), histSel = document.getElementById("histSel"), histText = document.getElementById("histText");
+document.getElementById("hist").addEventListener("click", () => {
+  const days = Object.keys(S.archive).sort().reverse();
+  if (!days.length) { toast("还没有以前的日志"); return; }
+  histSel.innerHTML = ""; days.forEach(d => histSel.append(Object.assign(el("option", "", d), { value: d })));
+  histText.value = S.archive[days[0]]; histDlg.showModal();
+});
+histSel.addEventListener("change", () => { histText.value = S.archive[histSel.value]; });
+document.getElementById("histClose").addEventListener("click", () => histDlg.close());
+
+const impDlg = document.getElementById("impDlg"), impText = document.getElementById("impText"),
+  impResult = document.getElementById("impResult"), impDo = document.getElementById("impDo");
+let parsed = null;
+document.getElementById("imp").addEventListener("click", () => { impResult.textContent = ""; impDo.disabled = true; impDlg.showModal(); });
+document.getElementById("impClose").addEventListener("click", () => impDlg.close());
+document.getElementById("impCheck").addEventListener("click", () => {
+  parsed = parseJournal(impText.value);
+  impResult.textContent = "读懂了 " + parsed.read + " 行。" +
+    (parsed.missed.length ? "\n下面 " + parsed.missed.length + " 行没读懂，导入后不会出现，请在文字里改好再检查，或导入后手动加：\n" + parsed.missed.join("\n") : "全部读懂。");
+  impDo.disabled = parsed.read === 0;
+});
+impDo.addEventListener("click", () => {
+  if (!parsed || !confirm("用这份日志替换页面上现在的内容？")) return;
+  const archive = S.archive; S = parsed.s; S.archive = archive;
+  S.prev = { f: { ...S.f }, hours: S.hours.map(h => ({ ...h })) };
+  impDlg.close(); render(); toast("已导入");
+});
+
+document.getElementById("export").addEventListener("click", () => {
+  const a = el("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify(S, null, 1)], { type: "application/json" }));
+  a.download = "日志备份-" + today() + ".json"; a.click(); URL.revokeObjectURL(a.href);
+});
+document.getElementById("import").addEventListener("change", async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try { const d = JSON.parse(await f.text()); if (!d.hours || !d.focus) throw 0;
+    if (!confirm("用备份文件替换现在的日志？")) return; S = d; render(); toast("已恢复");
+  } catch (err) { toast("这个文件不是日志备份"); }
+  e.target.value = "";
+});
+
+let toastTimer;
+function toast(t) { const n = document.getElementById("toast"); n.textContent = t; n.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(() => n.classList.remove("show"), 2600); }
+function msg(t, bad) { const m = document.getElementById("msg"); m.textContent = t; m.classList.toggle("bad", !!bad); }
+
+document.getElementById("rules").textContent = `1) @开头9行为固化格式为当日工时分布登记及汇总。若有工时数值产生，需在（）内简注事类；若有多项事类，请注明每项时间。
+2）= 后面跟的日期都是每周回顾日期，事项末尾无需计划日期。
+3）# 为分类汇总符号，#后面日期为汇总统计日期，事项末尾无需计划日期。
+4) –后面跟的只有3种情况：A) 周缩写加周数，如“W11”，B)月缩写加月数，如“M12”，C）4位数值登记日期，该日期都是事项入日志那一天的日期，该事项未打x移除前，此开头日期都不改。
+5）–开头事项在事项末尾都需注明计划日期（该日期不是过去日期，也不是日志当天日期），直至事项末尾打X结束移除出日志为止。若不是刚入日志的事项，跟踪事项通常体现3个日期，除了开头和结尾各一个，中间还需一个登记最新操作的那个日期；-号开头的跟踪事项若当天有更新，需将-号改为+号；第二天若+号开头的记录若无继续更新，需将+号改为-号。
+6) 持续关注区内与客诉/欠包装/测试未过/进度核对/船期预警/品质/会议相关记录都需在开头日期码后面加“类别：”标注，如：-1124客诉：某客如何如何1130
+7）若一个顶级客人下有多个不同简称客人，该客人所有简称都须用4位简称。
+8）已接单未入系统栏登记的订单都需是有具体数量的订单，无明确数量的订单预告不在此栏体现。
+9）界面整齐简洁，减少所有不必要的空格和空行。
+10) C1有单老客日志登记上一业务年度，当前业务年度和下一业务年度订单数值，若下一业务年度无订单数值，不用显示该业务年度信息。日志上的预估数量都是预估当前业务年度的未下单数量。每10月31日进入新的业务年度时，需将前前业务年度订单信息删除。
+11）C1有单老客区：所有客户都需从“前/前后/后”这3个选项中选一个标注在客户简称后面，标前或前后的客户需做数量预估；带后的客户需统计本年度未出数量。
+12）C1无单老客/C1新客区：所有客户都需从“前/前后/后”这3个选项中选一个标注在客户简称后面。
+13）C1无单老客指以前下过订单，但当前业务年度和上一业务年度无订单的客人；C1无单老客或C1新客一旦下单，该客户记录就需移到C1有单老客区。
+14）C1有单老客区，前道业务负责每个客人每个产品线名下需至少有一条跟踪记录来登记与该客人该产品线的互动进展及计划情况。`;
+
+render();
+</script>
+</body>
+</html>
