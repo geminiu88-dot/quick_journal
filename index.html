@@ -72,6 +72,14 @@
   body[data-tab="journal"] .tonly, body[data-tab="todo"] .jonly { display: none !important; }
   .todohead { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 12px; }
   .fname { font-weight: bold; }
+  #hours { background: var(--paper); border: 1px solid var(--border); border-radius: 4px; padding: 10px 16px; margin-bottom: 12px; }
+  .hhead { margin-bottom: 6px; }
+  .hrow { display: flex; gap: 6px; align-items: center; margin-bottom: 4px; padding: 2px 4px; border-radius: 4px; }
+  .hrow select, .hrow input, #hours button { font: inherit; font-size: 14px; padding: 2px 6px; border: 1px solid var(--border); border-radius: 4px;
+    background: var(--paper); color: var(--ink); appearance: auto; -webkit-appearance: auto; }
+  .hrow input { flex: 1; background: var(--edit); }
+  .hrow.bad { background: var(--bad); }
+  #hours button { cursor: pointer; }
   .todohead input { font: inherit; padding: 2px 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--edit); color: var(--ink); }
   .addbox { display: flex; gap: 8px; margin-bottom: 16px; align-items: flex-start; }
   .addbox textarea { flex: 1; min-height: 64px; font: inherit; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--paper); color: var(--ink); }
@@ -111,6 +119,7 @@
   <span class="legend"><span style="background:var(--edit)">黄色 = 填写</span> <span style="background:var(--calc)">蓝色 = 自动</span> <span style="background:var(--bad)">红色 = 要检查</span></span>
 </div>
 <main>
+  <div class="jonly" id="hours"></div>
   <div class="doc jonly" id="doc"></div>
   <div id="todo" class="tonly"></div>
   <details class="jonly">
@@ -219,6 +228,7 @@ function newDay() {
   S.prev = { f: { ...old.f }, hours: S.hours.map((h, i) => (h.h || h.note) ? { ...h } : (old.hours[i] || { ...h })) };
   Object.keys(S.f).forEach(k => { if (S.f[k]) S.prev.f[k] = S.f[k]; });
   S.hours.forEach(h => { h.h = ""; h.note = ""; });
+  S.entries = [];
   fieldsOf(DAILY).forEach(k => { S.f[k] = ""; });
   if (DAY.getDay() === 5) {                                  // Friday: weekly review starts empty, dated today
     fieldsOf(WEEKLY).forEach(k => { S.f[k] = ""; });
@@ -242,6 +252,9 @@ function seed() {
   [["1", "MDC，TTT为主"], ["1.5", "淘图0.5，整理集体图0.5，下样单0.5"], ["0.5", "给HKM挑推30款0.5"],
    ["1.5+", "找温州小凉鞋新工厂0.25，下样TRT 0.25，催样1+"], ["1-", "MDC条码处理 0.5-，TTS货期沟通0.5"],
    ["0.5", "TRT"], ["0.5", "LFGW"], ["0.75", "日志0.25，做卫生0.5"]].forEach(([h, note], i) => Object.assign(s.hours[i], { h, note }));
+  s.entries = [[0, "MDC，TTT为主", 60], [1, "淘图", 30], [1, "整理集体图", 30], [1, "下样单", 30], [2, "给HKM挑推30款", 30],
+    [3, "找温州小凉鞋新工厂", 15], [3, "下样TRT", 15], [3, "催样", 60, "+"], [4, "MDC条码处理", 30, "-"], [4, "TTS货期沟通", 30],
+    [5, "TRT", 30], [6, "LFGW", 30], [7, "日志", 15], [7, "做卫生", 30]].map(([cat, text, min, sign]) => ({ cat, text, min, sign: sign || "" }));
   s.f = {
     d1: "当天接收4，当天完成3，未结2，传递：17：50已传",
     d2: "已接单未入系统：AAA/2款0.6W啥原因1029（仅前道业务）；已接单未交接后道：AAA/2款/客已下单2天（仅前道业务）；已出货未更新系统：AAA/2.5W 1029（仅后道业务）",
@@ -385,10 +398,54 @@ function parseHours(text) {
 }
 function fmtHours(min, sign) { const h = Math.floor(min / 60), m = min % 60; return h + "h" + (m ? String(m).padStart(2, "0") : "") + (sign || ""); }
 function tidyHours(text) { const p = parseHours(text); return p && text.trim() ? fmtHours(p.min, p.sign) : text; }
-function hoursTotal() {
-  let sum = 0, plus = false, minus = false;
-  S.hours.forEach(h => { const p = parseHours(h.h); if (!p) return; sum += p.min; plus ||= p.sign === "+"; minus ||= p.sign === "-"; });
-  return fmtHours(sum, plus ? "+" : minus ? "-" : "");
+// Time is entered as a list of entries (category, what, hours, minutes), like a timesheet app;
+// the @ lines are written from them. Old journals (typed hours) are turned into entries once.
+function migrateHours() {
+  if (S.entries) return;
+  S.entries = S.hours.flatMap((h, i) => { const p = parseHours(h.h); return p && p.min ? [{ cat: i, text: h.note || "", min: p.min, sign: p.sign }] : []; });
+}
+function sumOf(es) {
+  const min = es.reduce((a, e) => a + (+e.min || 0), 0);
+  return fmtHours(min, es.some(e => e.sign === "+") ? "+" : es.some(e => e.sign === "-") ? "-" : "");
+}
+// one entry: just its text; several: each with its own time (rule 1)
+function noteOf(es) {
+  const named = es.filter(e => e.text.trim());
+  if (!named.length) return "";
+  return es.length === 1 ? named[0].text.trim() : named.map(e => e.text.trim() + fmtHours(+e.min || 0, e.sign)).join("，");
+}
+function hoursTotal() { return sumOf(S.entries); }
+
+const hoursEl = document.getElementById("hours");
+function renderHours() {
+  hoursEl.innerHTML = "";
+  const head = el("div", "hhead"); head.append(el("b", "", "今日工时 "), calc(hoursTotal));
+  hoursEl.append(head);
+  const opt = (sel, v, t) => { const o = el("option", "", t); o.value = v; sel.append(o); };
+  S.entries.forEach(e => {
+    const row = el("div", "hrow");
+    const cat = el("select"); HOUR_LABELS.forEach((l, i) => opt(cat, i, l)); cat.value = e.cat;
+    const text = el("input"); text.value = e.text; text.placeholder = "做了什么（如 淘图、MDC）";
+    const h = el("select"); for (let i = 0; i <= 12; i++) opt(h, i, i);
+    const m = el("select"); for (let i = 0; i < 60; i += 5) opt(m, i, String(i).padStart(2, "0"));
+    if (e.min % 5) opt(m, e.min % 60, String(e.min % 60).padStart(2, "0"));
+    h.value = Math.floor(e.min / 60); m.value = e.min % 60;
+    const sg = el("select"); opt(sg, "", "　"); opt(sg, "+", "+ 多一点"); opt(sg, "-", "- 少一点"); sg.value = e.sign;
+    const del = el("button", "", "删除");
+    const check = () => row.classList.toggle("bad", !(e.min > 0) || !e.text.trim());
+    const upd = () => { e.cat = +cat.value; e.text = text.value; e.min = +h.value * 60 + +m.value; e.sign = sg.value; check(); changed(); };
+    [cat, h, m, sg].forEach(x => x.addEventListener("change", upd)); text.addEventListener("input", upd);
+    del.addEventListener("click", () => { S.entries.splice(S.entries.indexOf(e), 1); renderHours(); changed(); });
+    row.append(cat, text, h, "小时", m, "分", sg, del); check();
+    hoursEl.append(row);
+  });
+  const add = el("button", "", "＋ 加一条");
+  add.addEventListener("click", () => {
+    const last = S.entries[S.entries.length - 1];
+    S.entries.push({ cat: last ? last.cat : 0, text: "", min: 30, sign: "" });
+    renderHours(); changed(); hoursEl.querySelectorAll(".hrow input")[S.entries.length - 1].focus();
+  });
+  hoursEl.append(add);
 }
 
 const prevF = k => (S.prev && S.prev.f && S.prev.f[k]) || "…";
@@ -410,16 +467,11 @@ function render() {
   refreshers = []; doc.innerHTML = "";
 
   // stored as "1.5+", shown as 1.5 h +, so the copy reads "1.5h+"
-  S.hours.forEach((h, i) => {
-    h.h = tidyHours(h.h);
-    const p = S.prev && S.prev.hours && S.prev.hours[i];
-    const box = ed(() => h.h, v => { h.h = v.trim(); }, (p && p.h && tidyHours(p.h)) || "0h",
-      { empty: "0h", check: () => parseHours(h.h) !== null });
-    box.title = "4h15 = 4小时15分；也可以打 1.5、1:30、90m，离开时自动变成 1h30；末尾可加 + 或 -";
-    box.addEventListener("blur", () => { const t = tidyHours(h.h); if (t !== h.h) { h.h = t; box.textContent = t; changed(); } });
-    line("@" + h.label + " ", box,
-      ed(() => h.note, v => { h.note = v; }, p && p.note ? "（" + p.note + "）" : "（备注）",
-        { wrap: true, check: () => !((parseHours(h.h) || {}).min > 0) || h.note.trim() !== "" }));
+  migrateHours();
+  renderHours();
+  HOUR_LABELS.forEach((label, i) => {
+    const es = () => S.entries.filter(e => e.cat === i);
+    line("@" + label + " ", calc(() => sumOf(es())), calc(() => { const n = noteOf(es()); return n ? "（" + n + "）" : ""; }));
   });
   line("@总计", calc(hoursTotal));
 
@@ -612,7 +664,7 @@ document.getElementById("impCheck").addEventListener("click", () => {
 });
 impDo.addEventListener("click", () => {
   if (!parsed || !confirm("用这份日志替换页面上现在的内容？")) return;
-  const archive = S.archive; S = parsed.s; S.archive = archive;
+  const keep = { archive: S.archive, todo: S.todo }; S = parsed.s; Object.assign(S, keep);
   S.prev = { f: { ...S.f }, hours: S.hours.map(h => ({ ...h })) };
   impDlg.close(); render(); toast("已导入");
 });
