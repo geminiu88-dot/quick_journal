@@ -23,4 +23,19 @@ worked out, red means "check this". 「复制日志」 copies the text exactly a
 - 「以前的日志」: the text of each day, last 60 days.
 - The fixed lines (labels, boxes, counts) are the `DAILY` / `WEEKLY` lists at
   the top of the script; the importer reads lines with the same lists.
+- **日常清单 tab** (the coded to-do list from the bosses). Paste messages: a
+  code like `1019G-02` is found anywhere in a line (MMDD + letter + `-` + the
+  day's number); each line with a code starts a new item. The letter says who
+  sent it: `SOURCES` at the top of the to-do script (group B01's letters,
+  other groups may differ). Status follows 须知 5: `OK` when the last note line
+  ends in X (打X登记日期 = that day), `G` when a note line starts with today's
+  date. 先前已传 = 1 once an OK item has been sent before (须知 6). The journal's
+  `*组内日常清单表` line is filled from this list.
+- 「下载Excel」 writes `日常清单-组-姓名-2YYMMDD-n.xlsx` (n = sends today) from a
+  template file: only the two 01 sheets and 02新增统计 are rewritten (02: 8 rows
+  per month, days Mon-Sat filled, sums as formulas); every other sheet stays as
+  it is in the template. 「导入Excel」 reads your current file once and makes it
+  the template (kept in this browser only). The built-in template
+  (`DEFAULT_XLSX`) is the group's file with the example rows, the 须知 pictures
+  and author names removed. No library: the browser unzips/zips the file.
 - Not done yet: business-year rollover on 31 Oct (rule 10), other teams' formats.
