@@ -1,0 +1,1286 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>日志 BC组</title>
+<style>
+  :root {
+    --bg: #f3f1ec; --paper: #ffffff; --ink: #1d1d1b; --muted: #8a877f;
+    --edit: #fff6c8; --edit-line: #e2c94a; --calc: #e6f0fb; --bad: #ffd7d2; --bad-line: #d2433a;
+    --ui: #2f6fb3; --border: #d9d5cc;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1b1b1a; --paper: #262624; --ink: #ecebe6; --muted: #9a978f;
+      --edit: #4a4320; --edit-line: #a8902c; --calc: #233447; --bad: #5a2622; --bad-line: #ff8379;
+      --ui: #8ab8ea; --border: #44423d;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1b1b1a; --paper: #262624; --ink: #ecebe6; --muted: #9a978f;
+    --edit: #4a4320; --edit-line: #a8902c; --calc: #233447; --bad: #5a2622; --bad-line: #ff8379;
+    --ui: #8ab8ea; --border: #44423d;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.75 "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif; }
+  .bar { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    padding: 8px 16px; background: var(--paper); border-bottom: 1px solid var(--border); }
+  .bar b { margin-right: 8px; }
+  .bar button, .bar label.btn { font: inherit; font-size: 14px; padding: 3px 12px; border: 1px solid var(--border);
+    border-radius: 6px; background: var(--paper); color: var(--ink); cursor: pointer; }
+  .bar button.main { background: var(--ui); border-color: var(--ui); color: #fff; }
+  .bar button.hot { background: var(--edit); border-color: var(--edit-line); }
+  .bar input[type=date] { font: inherit; font-size: 14px; padding: 2px 6px; border: 1px solid var(--border);
+    border-radius: 6px; background: var(--paper); color: var(--ink); }
+  .bar .msg { color: var(--muted); font-size: 13px; }
+  .bar .msg.bad { color: var(--bad-line); }
+  .legend { font-size: 13px; color: var(--muted); }
+  .legend span { padding: 0 6px; border-radius: 3px; }
+  main { max-width: 1500px; margin: 16px auto; padding: 0 16px; }
+  .doc { background: var(--paper); border: 1px solid var(--border); border-radius: 4px; padding: 24px 32px; }
+  .line { min-height: 1.75em; white-space: pre-wrap; word-break: break-all; position: relative; }
+  .line:hover > .ui { visibility: visible; }
+  [contenteditable] { background: var(--edit); border-bottom: 1px dashed var(--edit-line); outline: none;
+    padding: 0 2px; border-radius: 2px; min-width: 1.5em; display: inline-block; }
+  [contenteditable]:focus { box-shadow: 0 0 0 2px var(--edit-line); }
+  [contenteditable]:empty::before { content: attr(data-ph); color: var(--muted); }
+  .wrap:not(:empty)::before { content: "（"; }
+  .wrap:not(:empty)::after { content: "）"; }
+  .calc { background: var(--calc); border-radius: 2px; padding: 0 1px; }
+  .bad { background: var(--bad) !important; border-bottom-color: var(--bad-line) !important; }
+  select { font: inherit; color: var(--ink); background: var(--edit); border: 0; border-bottom: 1px dashed var(--edit-line);
+    padding: 0; appearance: none; -webkit-appearance: none; cursor: pointer; }
+  select.none { color: var(--muted); font-size: 12px; background: none; }
+  .ui { visibility: hidden; font-size: 12px; margin-left: 8px; color: var(--ui); cursor: pointer; user-select: none; }
+  .ui:hover { text-decoration: underline; }
+  .add { display: block; visibility: visible; font-size: 13px; margin: 0 0 2px 0; color: var(--ui); opacity: .7; }
+  .add:hover { opacity: 1; }
+  .closed { color: var(--muted); text-decoration: line-through; }
+  details { margin-top: 16px; background: var(--paper); border: 1px solid var(--border); border-radius: 4px; padding: 8px 16px; }
+  details pre { white-space: pre-wrap; font: inherit; font-size: 14px; margin: 8px 0; }
+  dialog { width: min(900px, 92vw); border: 1px solid var(--border); border-radius: 6px; background: var(--paper); color: var(--ink); }
+  dialog textarea { width: 100%; height: 50vh; font: inherit; font-size: 14px; background: var(--bg); color: var(--ink); }
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--paper);
+    padding: 8px 18px; border-radius: 6px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .toast.show { opacity: .92; }
+  .tabs { display: inline-flex; margin-right: 8px; }
+  .tabs button { border-radius: 0; }
+  .tabs button:first-child { border-radius: 6px 0 0 6px; } .tabs button:last-child { border-radius: 0 6px 6px 0; margin-left: -1px; }
+  body[data-tab="journal"] #tabJournal, body[data-tab="todo"] #tabTodo { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  body[data-tab="journal"] .tonly, body[data-tab="todo"] .jonly { display: none !important; }
+  .todohead { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 12px; }
+  .fname { font-weight: bold; }
+  .jgrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+  .prevwrap { position: sticky; top: 64px; max-height: calc(100vh - 80px); display: flex; flex-direction: column; }
+  .prevhead { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  .prevhead #badCount.bad { color: var(--bad-line); }
+  .prevwrap .doc { overflow: auto; font-size: 13px; line-height: 1.6; padding: 12px 16px; }
+  .badline { background: var(--bad); }
+  .fsec { background: var(--paper); border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px; margin-bottom: 12px; }
+  .fsec h3 { margin: 0 0 2px; font-size: 16px; }
+  .fsec summary { cursor: pointer; }
+  .hint { color: var(--muted); font-size: 12px; margin: 0 0 8px; display: block; }
+  .field { display: block; margin: 6px 0; }
+  .flabel { display: block; font-size: 13px; font-weight: bold; }
+  .field textarea, .field input, .icard textarea, .irow input, .irow select, .fsec button {
+    font: inherit; font-size: 14px; padding: 3px 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--paper); color: var(--ink);
+    appearance: auto; -webkit-appearance: auto; }
+  .field textarea, .icard textarea { width: 100%; resize: none; overflow: hidden; background: var(--edit); line-height: 1.5; }
+  .fsec button { cursor: pointer; }
+  .fout { font-size: 12px; color: var(--muted); margin: 2px 0 8px; word-break: break-all; }
+  .fgroup { border-left: 3px solid var(--border); padding-left: 10px; margin-bottom: 10px; }
+  .wgroup { margin-top: 10px; } .wtitle { font-weight: bold; font-size: 14px; }
+  .icard { border: 1px solid var(--border); border-left: 4px solid var(--edit-line); border-radius: 4px; padding: 6px 8px; margin: 6px 0; }
+  .icard.bad { border-left-color: var(--bad-line); background: var(--paper) !important; }
+  .icard.closed { opacity: .6; }
+  .irow { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .irow textarea, .irow .grow { flex: 1; min-width: 200px; }
+  .irow.small { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .irow.small button, .irow.small input { font-size: 12px; padding: 1px 6px; }
+  input.short { width: 6em; }
+  .ccard { border: 1px solid var(--border); border-radius: 6px; padding: 8px; margin: 8px 0; }
+  .pline { margin: 6px 0 6px 12px; padding-left: 8px; border-left: 2px dotted var(--border); }
+  .addbtn { margin-top: 4px; }
+  .fsec button.same { font-size: 12px; padding: 0 8px; margin: 2px 0; }
+  #hours { background: var(--paper); border: 1px solid var(--border); border-radius: 4px; padding: 10px 16px; margin-bottom: 12px; }
+  .hhead { margin-bottom: 6px; }
+  .hrow { display: flex; gap: 6px; align-items: center; margin-bottom: 4px; padding: 2px 4px; border-radius: 4px; }
+  .hrow select, .hrow input, #hours button { font: inherit; font-size: 14px; padding: 2px 6px; border: 1px solid var(--border); border-radius: 4px;
+    background: var(--paper); color: var(--ink); appearance: auto; -webkit-appearance: auto; }
+  .hrow input { flex: 1; background: var(--edit); }
+  .hrow.bad { background: var(--bad); }
+  #hours button { cursor: pointer; }
+  .todohead input { font: inherit; padding: 2px 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--edit); color: var(--ink); }
+  .addbox { display: flex; gap: 8px; margin-bottom: 16px; align-items: flex-start; }
+  .addbox textarea { flex: 1; min-height: 64px; font: inherit; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--paper); color: var(--ink); }
+  .addbox button { font: inherit; padding: 6px 16px; border-radius: 6px; border: 1px solid var(--ui); background: var(--ui); color: #fff; cursor: pointer; }
+  .card { background: var(--paper); border: 1px solid var(--border); border-left: 4px solid var(--edit-line); border-radius: 4px; padding: 8px 12px; margin-bottom: 8px; }
+  .card.bad { background: var(--paper) !important; border-left-color: var(--bad-line) !important; }
+  .card.ok { border-left-color: #3f9b5a; opacity: .75; }
+  .card:hover .ui { visibility: visible; }
+  .cardtop { display: flex; gap: 8px; align-items: baseline; }
+  .cardtop [contenteditable] { background: none; border-bottom: 1px dashed var(--border); }
+  .code { font-weight: bold; min-width: 6em; }
+  .desc { flex: 1; }
+  .chip { font-size: 12px; padding: 0 8px; border-radius: 10px; background: var(--calc); white-space: nowrap; }
+  .chip.st[data-s="OK"] { background: #3f9b5a; color: #fff; } .chip.st[data-s="G"] { background: var(--edit-line); color: #000; }
+  .notes { width: 100%; margin-top: 6px; font: inherit; line-height: 1.6; padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px;
+    background: var(--edit); color: var(--ink); resize: none; overflow: hidden; }
+  .cardbtns { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
+  .cardbtns button { font: inherit; font-size: 13px; padding: 1px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--paper); color: var(--ink); cursor: pointer; }
+  .prob { color: var(--bad-line); font-size: 13px; }
+  @media print { .bar, .ui, .add, details { display: none !important; } [contenteditable], .calc, select { background: none; border: 0; } }
+</style>
+</head>
+<body>
+<div class="bar">
+  <span class="tabs"><button id="tabJournal">日志</button><button id="tabTodo">日常清单</button></span>
+  日期 <input type="date" id="day">
+  <span class="jonly"><button class="main" id="copy">复制日志</button>
+  <button id="week" title="把每周回顾的日期和统计数字更新到今天">周五更新统计</button>
+  <button id="hist">以前的日志</button>
+  <button id="imp">导入现有日志</button>
+  <button id="sample">格式范本</button></span>
+  <span class="tonly"><button class="main" id="xlsxOut">下载Excel</button>
+  <label class="btn">导入Excel<input type="file" id="xlsxIn" accept=".xlsx" hidden></label></span>
+  <button id="export">备份到文件</button>
+  <label class="btn">从备份恢复<input type="file" id="import" accept=".json" hidden></label>
+  <span class="msg" id="msg"></span>
+</div>
+<main>
+  <div class="jgrid jonly">
+    <div id="form"></div>
+    <div class="prevwrap">
+      <div class="prevhead"><b>日志文字</b>（自动生成，不用改；按「复制日志」）<span id="badCount"></span></div>
+      <div class="doc" id="doc"></div>
+    </div>
+  </div>
+  <div id="todo" class="tonly"></div>
+  <details class="jonly">
+    <summary>日志规则（参考，不复制进日志）</summary>
+    <pre id="rules"></pre>
+    <p class="legend">自动做的：日期码、工时总计、本周第几周、+/- 号（今天改过的事项是 +，其他是 -）、计划日期检查（不能是今天或过去）、
+      计划日期写 X 的事项第二天自动删除、各类登记数、客户数、每周回顾的日期和统计（按“周五更新统计”时记下）。</p>
+  </details>
+</main>
+<dialog id="histDlg">
+  <p><select id="histSel"></select> <button id="histClose">关闭</button></p>
+  <textarea id="histText" readonly></textarea>
+</dialog>
+<dialog id="sampleDlg">
+  <p>日志格式范本（日志格式-BC组员-2251023）<button id="sampleClose" style="float:right">关闭</button></p>
+  <textarea id="sampleText" readonly></textarea>
+</dialog>
+<dialog id="impDlg">
+  <p>把现有的日志文字整篇粘贴进来（规则部分可以不要），按“检查”。</p>
+  <textarea id="impText"></textarea>
+  <p><button id="impCheck">检查</button> <button id="impDo" disabled>导入</button> <button id="impClose">关闭</button></p>
+  <pre id="impResult" style="white-space:pre-wrap"></pre>
+</dialog>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+// Everything the journal remembers is kept in this browser (localStorage), on this PC only.
+const KEY = "journal-bc-v1";
+const CATS = ["", "客诉", "欠包装", "测试未过", "进度核对", "船期预警", "品质", "会议"];
+const HOUR_LABELS = ["邮件回复", "立项开发", "搜款推客", "其他开发", "定单相关", "单据", "整样", "其他事务"];
+
+// ---------- dates ----------
+function iso(d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+function fromIso(s) { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); }
+function mmdd(d) { return String(d.getMonth() + 1).padStart(2, "0") + String(d.getDate()).padStart(2, "0"); }
+function isoWeek(d) {
+  const t = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  t.setDate(t.getDate() + 3 - (t.getDay() + 6) % 7);
+  const w1 = new Date(t.getFullYear(), 0, 4);
+  return 1 + Math.round(((t - w1) / 864e5 - 3 + (w1.getDay() + 6) % 7) / 7);
+}
+function monday(d) { const t = new Date(d); t.setDate(t.getDate() - (t.getDay() + 6) % 7); return t; }
+function lastFriday(d) { const t = new Date(d); t.setDate(t.getDate() - (t.getDay() + 2) % 7); return t; }
+// a 4-digit MMDD near the journal day -> Date (picks the year so it is within half a year)
+function mmddToDate(s, ref) {
+  if (!/^\d{4}$/.test(s)) return null;
+  const m = +s.slice(0, 2), d = +s.slice(2);
+  if (m < 1 || m > 12 || d < 1 || d > 31) return null;
+  let t = new Date(ref.getFullYear(), m - 1, d);
+  if (t - ref > 182 * 864e5) t = new Date(ref.getFullYear() - 1, m - 1, d);
+  if (ref - t > 182 * 864e5) t = new Date(ref.getFullYear() + 1, m - 1, d);
+  return t;
+}
+
+let DAY = new Date(); DAY = new Date(DAY.getFullYear(), DAY.getMonth(), DAY.getDate());
+const today = () => iso(DAY);
+const T = () => mmdd(DAY);
+
+// ---------- the fixed lines: text, {d} = journal date, {w} = weekly date, {f: box}, {c: automatic} ----------
+const DAILY = [
+  ["*组内日常清单表：", { d: 1 }, "当天接收", { c: "tdIn" }, "，当天完成", { c: "tdDone" }, "，未结", { c: "tdOpen" }, "，传递：", { c: "tdSent" }],
+  ["*接单/出货系统更新：", { d: 1 }, { f: "d2" }],
+  ["*在手需下样还未下样款数：", { d: 1 }, { f: "d3" }],
+  ["*客户投诉：", { d: 1 }, { f: "d4" }, "，今入持续关注区登记客诉：", { c: "newComplaints" }, "条"],
+];
+const WEEKLY = [
+  ["*本周工厂意见/投诉：", { w: 1 }, { f: "w1" }],
+  ["*本周搜款推客：", { w: 1 }, { f: "w2" }],
+  ["*本周来联系我们C2C3C4客/新客数：", { w: 1 }, { f: "w3" }],
+  ["*负责C1C2客户数：", { w: 1 }, " C1日志", { c: "c1" }, "系统", { f: "w4a" }, ", C2日志", { c: "c2" }, "系统", { f: "w4b" }, { f: "w4c" }],
+  ["*未结账务：", { w: 1 }, { f: "w5" }],
+  ["*已投产欠包装：", { w: 1 }, { f: "w6" }, "，持续关注区登记欠包装：", { c: "欠包装" }],
+  ["*测试未过：", { w: 1 }, { f: "w7" }, "，持续关注区登记：", { c: "测试未过" }],
+  ["*进度核对/船期预警：", { w: 1 }, "进度核对", { f: "w8a" }, "，船期预警", { f: "w8b" }, "；持续关注区登记：进度核对", { c: "进度核对" }, "船期预警", { c: "船期预警" }],
+  ["*品质关注点：", { w: 1 }, { f: "w9" }, "，持续关注区登记品质：", { c: "品质" }],
+  ["*待开客户会议/来访：", { w: 1 }, { f: "w10a" }, "，持续关注区登记会议：", { c: "会议" }, { f: "w10b" }],
+  ["*本周入系统订单款数：", { w: 1 }, { f: "w11" }],
+  ["*系统在手设计稿-业务模块：", { w: 1 }, { f: "w12" }],
+  ["*本周下样数：", { w: 1 }, { f: "w13" }],
+  ["*未完试样单数：", { w: 1 }, { f: "w14" }],
+  ["*本周超30天样单数：", { w: 1 }, { f: "w15a" }, { w: 1 }, { f: "w15b" }],
+];
+const fieldsOf = lines => lines.flat().filter(p => p.f).map(p => p.f);
+
+// ---------- storage ----------
+function load() {
+  try { const s = localStorage.getItem(KEY); if (s) return JSON.parse(s); } catch (e) {}
+  return null;
+}
+function save() {
+  if (S.weekDate === today()) S.weekSnap = counts();   // weekly numbers follow the page on the update day, then stay
+  if (doc.childNodes.length) S.archive[today()] = journalText();
+  const days = Object.keys(S.archive).sort(); days.slice(0, -60).forEach(d => delete S.archive[d]);
+  try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { msg("保存失败：浏览器不让存数据", true); }
+}
+
+// ---------- a new day ----------
+// Runs the first time the page is opened on a later day than the last entry. Days not opened don't exist.
+// Yesterday's typed values stay visible in grey inside the empty boxes.
+function newDay() {
+  if (S.lastDay && today() <= S.lastDay) return;
+  const last = S.lastDay ? fromIso(S.lastDay) : null;
+  // keep the last value that was actually typed (a box left empty keeps the older grey hint)
+  const old = S.prev || { f: {}, hours: [] };
+  S.prev = { f: { ...old.f }, hours: S.hours.map((h, i) => (h.h || h.note) ? { ...h } : (old.hours[i] || { ...h })) };
+  Object.keys(S.f).forEach(k => { if (S.f[k]) S.prev.f[k] = S.f[k]; });
+  S.hours.forEach(h => { h.h = ""; h.note = ""; });
+  S.entries = [];
+  fieldsOf(DAILY).forEach(k => { S.f[k] = ""; });
+  if (DAY.getDay() === 5) {                                  // Friday: weekly review starts empty, dated today
+    fieldsOf(WEEKLY).forEach(k => { S.f[k] = ""; });
+    S.weekDate = today();
+  }
+  if (last && iso(monday(DAY)) !== iso(monday(last))) {      // first entry of a new week: W-items get the new week no.
+    const next = new Date(monday(DAY)); next.setDate(next.getDate() + 7);
+    S.remind.forEach(x => { if (/^W\d+$/.test(x.start)) { x.start = "W" + isoWeek(DAY); x.plan = mmdd(next); } });
+  }
+  S.lastDay = today();
+}
+
+// ---------- starting content (the template's example) ----------
+function it(start, cat, text, plan, plus) { return { start, cat, text, plan, edited: plus ? today() : "", closed: "" }; }
+function blank() {
+  return { hours: HOUR_LABELS.map(label => ({ label, h: "", note: "" })), f: {}, weekDate: iso(lastFriday(DAY)), weekSnap: null,
+    remind: [], focus: [], clients: [], c1none: [], c2: [], archive: {}, prev: null, lastDay: today() };
+}
+function seed() {
+  const s = blank();
+  [["1", "MDC，TTT为主"], ["1.5", "淘图0.5，整理集体图0.5，下样单0.5"], ["0.5", "给HKM挑推30款0.5"],
+   ["1.5+", "找温州小凉鞋新工厂0.25，下样TRT 0.25，催样1+"], ["1-", "MDC条码处理 0.5-，TTS货期沟通0.5"],
+   ["0.5", "TRT"], ["0.5", "LFGW"], ["0.75", "日志0.25，做卫生0.5"]].forEach(([h, note], i) => Object.assign(s.hours[i], { h, note }));
+  s.entries = [[0, "MDC，TTT为主", 60], [1, "淘图", 30], [1, "整理集体图", 30], [1, "下样单", 30], [2, "给HKM挑推30款", 30],
+    [3, "找温州小凉鞋新工厂", 15], [3, "下样TRT", 15], [3, "催样", 60, "+"], [4, "MDC条码处理", 30, "-"], [4, "TTS货期沟通", 30],
+    [5, "TRT", 30], [6, "LFGW", 30], [7, "日志", 15], [7, "做卫生", 30]].map(([cat, text, min, sign]) => ({ cat, text, min, sign: sign || "" }));
+  s.f = {
+    d1: "当天接收4，当天完成3，未结2，传递：17：50已传",
+    d2: "已接单未入系统：AAA/2款0.6W啥原因1029（仅前道业务）；已接单未交接后道：AAA/2款/客已下单2天（仅前道业务）；已出货未更新系统：AAA/2.5W 1029（仅后道业务）",
+    d3: "款2：AAA款1，ABC款1，打算如何1029",
+    d4: "/1条, 知会QC/QA：1条；阿文确认收到：1条",
+    w1: "投诉2，某厂投诉如何如何，某某厂投诉如何如何",
+    w2: "/2客AAA/22款，BBB/50款，下周计划：1客CEC1024（仅前道业务）",
+    w3: "/2客，激活：1/某国DDD，新入系统：1/某国CENTE；系统更新自评：5（仅前道业务）",
+    w4a: "4", w4b: "1", w4c: "；与系统客户总表校对时点：1017/14:30完成（仅前道业务）",
+    w5: "如何如何", w6: "款1", w7: "款1", w8a: "2", w8b: "1", w9: "需关注点2",
+    w10a: "客1", w10b: "，系统客户来访待开会议数1；系统更新自评：5",
+    w11: "款5，最久在手工作天数1天，入系统速度自评：5（）",
+    w12: "已通过未下样数2，下样推进时效自评：4（如何如何）（仅有立项业务）",
+    w13: "样3，最久在手工作天数1天，下样速度自评：5（）",
+    w14: "单3，无需试样备注描述合规自评：5",
+    w15a: "：1单，上周2单；本周最久已下样119天；本周本人做了哪些推动工作/自评：", w15b: "如何如何/自评：4.5",
+  };
+  s.remind = [it("W" + isoWeek(DAY), "", "周一传未完日常清单表，1020已传（或：1020无未完记录），下周", "1027", false)];
+  s.focus = [
+    it("1021", "客诉", "某客投诉某事，已知会QC/QA，阿文已确认收到，1022如何如何", "1029", false),
+    it(T(), "客诉", "AAA如何如何，已知会QC/QA，阿文已确认收到", "1027", true),
+    it(T(), "欠包装", "AAA某厂1款，如何如何", "1030", true),
+    it("1020", "测试未过", "AAA某厂1款，如何如何", "1030", false),
+    it("1017", "进度核对", "ABC进度表发哪些QC，进度目前没有问题", "1024", false),
+    it("1017", "进度核对", "DDD进度表发哪些QC，进度目前没有问题", "1024", false),
+    it("1020", "船期预警", "ABC某某厂1W双客期1115交，1022做了啥，打算如何", "1029", false),
+    it("1017", "品质", "BBB某厂某材质，1021如何，1022如何", "1030", false),
+    it("1020", "品质", "某厂某材质如何，1023如何", "1028", true),
+    it("0913", "会议", "ABC某日来访，1020打算如何", "1029", false),
+    it("1013", "会议", "DDD10月23日15:00会议，1023如何如何", "X", true),
+    it("1014", "", "某事如何，1022如何", "1029", false),
+  ];
+  s.focus[10].closed = today();
+  s.clients = [
+    { name: "ABC1", role: "前", lines: [
+      { product: "鞋1", qty: "224单80532双；225单3000双，226单5000双，估105000双", items: [it("1017", "", "啥事，1023做了啥，打算如何", "1028", true)] },
+      { product: "鞋2", qty: "224单0双；225单8532双，估21300双",
+        items: [it("1010", "", "男段3款，1021如何，如何", "1030", false), it("1010", "", "女段2款，1023如何，如何", "1029", true)] } ] },
+    { name: "ABCM", role: "前后", lines: [
+      { product: "鞋1", qty: "224单3000双；225单2000双，未出0双，226单3000双，估4000双", items: [it("1017", "", "如何如何，1021如何如何", "1030", false)] } ] },
+    { name: "BBB", role: "后", lines: [{ product: "鞋1", qty: "225未出3000双", items: [it("1023", "", "如何如何", "1029", true)] }] },
+  ];
+  s.c1none = [it("0430", "", "（英国FGD前）如何，0725寄样，0920如何如何", "1024", false)];
+  s.c2 = [it("0220", "", "（德国ADG）如何，0230如何，0630如何如何", "1110", false)];
+  return s;
+}
+
+let S = load() || seed();
+
+// ---------- counts ----------
+function alive(x) { return !x.closed || x.closed >= today(); }      // X items stay visible on the day they are closed
+function openFocus(cat) { return S.focus.filter(x => x.cat === cat && x.plan !== "X" && alive(x)).length; }
+function counts() {
+  const c = { c1: S.clients.length + S.c1none.filter(alive).length, c2: S.c2.filter(alive).length };
+  CATS.slice(2).forEach(k => { c[k] = openFocus(k); });
+  return c;
+}
+function calcValue(k) {
+  if (k.startsWith("td")) return todoCount(k);                 // from the 日常清单 tab
+  if (k === "newComplaints") return S.focus.filter(x => x.cat === "客诉" && x.start === T()).length;
+  const live = S.weekDate === today() || !S.weekSnap;
+  return (live ? counts() : S.weekSnap)[k];
+}
+
+// ---------- the page: a plain form on the left, the journal text it makes on the right ----------
+// You only ever fill in the form. The journal text is generated from it, in the boss's exact format,
+// and is never edited by hand.
+let refreshers = [];
+const doc = document.getElementById("doc");      // the generated journal text (read-only)
+const form = document.getElementById("form");
+
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+function calc(fn) { const s = el("span", "calc"); const r = () => { s.textContent = fn(); }; r(); refreshers.push(r); return s; }
+function ui(text, fn, title) { const s = el("span", "ui", text); if (title) s.title = title; s.addEventListener("click", fn); return s; }
+
+function planOk(x) {
+  if (x.plan === "X") return true;
+  const p = mmddToDate(x.plan, DAY); return !!p && p > DAY;
+}
+
+// Hours are written the group leader's way: 4h15 = 4 hours 15 minutes, 4h = 4 hours, "+"/"-" at the end.
+// parseHours only reads old typed journals; new hours come from the time entries.
+function parseHours(text) {
+  let t = (text || "").replace(/\s+/g, "").replace(/小时|時|H/g, "h").replace(/分钟|分|min/g, "m").replace(/：/g, ":");
+  const sign = (t.match(/[+-](?=[^+-]*$)/) || [""])[0]; t = t.replace(/[+-]/g, "");
+  let m;
+  if (t === "") return { min: 0, sign };
+  if ((m = t.match(/^(\d+)h(\d{1,2})m?$/)) && +m[2] < 60) return { min: +m[1] * 60 + +m[2], sign };
+  if ((m = t.match(/^(\d+):(\d{2})$/)) && +m[2] < 60) return { min: +m[1] * 60 + +m[2], sign };
+  if ((m = t.match(/^(\d*\.?\d+)h?$/))) return { min: Math.round(+m[1] * 60), sign };
+  if ((m = t.match(/^(\d+)m$/))) return { min: +m[1], sign };
+  return null;
+}
+function fmtHours(min, sign) { const h = Math.floor(min / 60), m = min % 60; return h + "h" + (m ? String(m).padStart(2, "0") : "") + (sign || ""); }
+function tidyHours(text) { const p = parseHours(text); return p && text.trim() ? fmtHours(p.min, p.sign) : text; }
+// Time is entered as a list of entries (category, what, hours, minutes), like a timesheet app.
+// Old journals (typed hours) are turned into entries once.
+function migrateHours() {
+  if (S.entries) return;
+  S.entries = S.hours.flatMap((h, i) => { const p = parseHours(h.h); return p && p.min ? [{ cat: i, text: h.note || "", min: p.min, sign: p.sign }] : []; });
+}
+function sumOf(es) {
+  const min = es.reduce((a, e) => a + (+e.min || 0), 0);
+  return fmtHours(min, es.some(e => e.sign === "+") ? "+" : es.some(e => e.sign === "-") ? "-" : "");
+}
+// one entry: just its text; several: each with its own time (rule 1)
+function noteOf(es) {
+  const named = es.filter(e => e.text.trim());
+  if (!named.length) return "";
+  return es.length === 1 ? named[0].text.trim() : named.map(e => e.text.trim() + fmtHours(+e.min || 0, e.sign)).join("，");
+}
+function hoursTotal() { return sumOf(S.entries); }
+
+// ---------- the journal text: one {t, bad} per line; bad = why the line still needs work ----------
+const LINE1 = "--------------------------------------------------------------------------------------";
+const LINE2 = "-----------------------------------------------------";
+function itemText(x, withCat) { return (x.edited === today() ? "+" : "-") + x.start + (withCat && x.cat ? x.cat + "：" : "") + x.text.trim() + x.plan; }
+function itemBad(x) { return !x.text.trim() ? "事项没写内容" : planOk(x) ? "" : "计划日期要晚于今天"; }
+function specText(spec) {
+  let bad = "";
+  const t = spec.map(p => {
+    if (typeof p === "string") return p;
+    if (p.d) return T();
+    if (p.w) return mmdd(fromIso(S.weekDate));
+    if (p.c) return String(calcValue(p.c));
+    const v = (S.f[p.f] || "").trim(); if (!v) bad = "有空没填"; return v;
+  }).join("");
+  return { t, bad };
+}
+function genLines() {
+  const L = [], add = (t, bad = "") => L.push({ t, bad });
+  const items = (list, withCat) => list.filter(alive).forEach(x => add(itemText(x, withCat), itemBad(x)));
+  HOUR_LABELS.forEach((label, i) => { const es = S.entries.filter(e => e.cat === i), n = noteOf(es); add("@" + label + " " + sumOf(es) + (n ? "（" + n + "）" : "")); });
+  add("@总计" + hoursTotal(), S.entries.length ? "" : "今日工时还没填");
+  add("▲每日回顾：");
+  DAILY.forEach(sp => { const r = specText(sp); add(r.t, r.bad); });
+  add("▲提醒：本周第" + isoWeek(DAY) + "周");
+  items(S.remind, false);
+  add("▲持续关注(客户工厂投诉/欠包装/测试未过/进度核对/船期预警/品质难点/会议/其他等跟踪)：");
+  items(S.focus, true);
+  add(LINE1);
+  add("●●每周回顾：以下统计值每周5更新：" + mmdd(fromIso(S.weekDate)) + "更新");
+  WEEKLY.forEach(sp => { const r = specText(sp); add(r.t, r.bad); });
+  add("●C1有单老客：" + S.clients.length + "客");
+  S.clients.forEach(c => c.lines.forEach((l, i) => {
+    add((i === 0 ? c.name + c.role + " " : "") + l.product, i === 0 && !c.name ? "客户简称没填" : "");
+    add(l.qty, l.qty.trim() ? "" : "数量没填");
+    items(l.items, false);
+  }));
+  add("●C1无单老客/C1新客：" + S.c1none.filter(alive).length + "客");
+  items(S.c1none, false);
+  add("●C2目标客：" + S.c2.filter(alive).length + "客");
+  items(S.c2, false);
+  add(LINE2);
+  add("●备忘：");
+  add("*日常清单表：若有新的记录生成或有记录完成了，需当天传递；");
+  add("*日常清单表：若有未完成的记录，无论有无更新，每周一传递；");
+  return L;
+}
+function journalText() { return genLines().map(l => l.t).join("\r\n"); }
+function renderPreview() {
+  doc.innerHTML = "";
+  const lines = genLines();
+  lines.forEach(l => { const d = el("div", "line" + (l.bad ? " badline" : ""), l.t || " "); if (l.bad) d.title = l.bad; doc.append(d); });
+  const n = lines.filter(l => l.bad).length;
+  const c = document.getElementById("badCount");
+  c.textContent = n ? "　" + n + " 行还要处理（红色，鼠标放上去看原因）" : "　全部填好了";
+  c.classList.toggle("bad", n > 0);
+}
+
+// ---------- the form ----------
+function section(title, hint, parent = form) {
+  const s = el("section", "fsec"); s.append(el("h3", "", title));
+  if (hint) s.append(el("p", "hint", hint));
+  parent.append(s); return s;
+}
+function autosize(t) { const f = () => { t.style.height = "auto"; t.style.height = t.scrollHeight + 2 + "px"; }; t.addEventListener("input", f); setTimeout(f); return f; }
+function textBox(get, set, ph, multi) {
+  const t = el(multi ? "textarea" : "input"); t.value = get(); t.placeholder = ph || "";
+  if (multi) { t.rows = 1; autosize(t); }
+  t.addEventListener("input", () => { set(t.value); changed(); });
+  return t;
+}
+function addButton(text, fn) { const b = el("button", "addbtn", "＋ " + text); b.addEventListener("click", fn); return b; }
+const opt = (sel, v, t) => { const o = el("option", "", t); o.value = v; sel.append(o); };
+
+// 今日工时
+function hoursSection() {
+  const sec = section("今日工时", "每做一件事加一条：选类别，写做了什么，选时间。日志里的 @ 行和总计自动算。");
+  sec.querySelector("h3").append("　", calc(hoursTotal));
+  S.entries.forEach(e => {
+    const row = el("div", "hrow");
+    const cat = el("select"); HOUR_LABELS.forEach((l, i) => opt(cat, i, l)); cat.value = e.cat;
+    const text = el("input"); text.value = e.text; text.placeholder = "做了什么（如 淘图、MDC）";
+    const h = el("select"); for (let i = 0; i <= 12; i++) opt(h, i, i);
+    const m = el("select"); for (let i = 0; i < 60; i += 5) opt(m, i, String(i).padStart(2, "0"));
+    if (e.min % 5) opt(m, e.min % 60, String(e.min % 60).padStart(2, "0"));
+    h.value = Math.floor(e.min / 60); m.value = e.min % 60;
+    const sg = el("select"); opt(sg, "", "　"); opt(sg, "+", "+ 多一点"); opt(sg, "-", "- 少一点"); sg.value = e.sign;
+    const del = el("button", "", "删除");
+    const check = () => row.classList.toggle("bad", !(e.min > 0) || !e.text.trim());
+    const upd = () => { e.cat = +cat.value; e.text = text.value; e.min = +h.value * 60 + +m.value; e.sign = sg.value; check(); changed(); };
+    [cat, h, m, sg].forEach(x => x.addEventListener("change", upd)); text.addEventListener("input", upd);
+    del.addEventListener("click", () => { S.entries.splice(S.entries.indexOf(e), 1); renderForm(); changed(); });
+    row.append(cat, text, h, "小时", m, "分", sg, del); check();
+    sec.append(row);
+  });
+  sec.append(addButton("加一条", () => {
+    const last = S.entries[S.entries.length - 1];
+    S.entries.push({ cat: last ? last.cat : 0, text: "", min: 30, sign: "" });
+    renderForm(); changed(); const ins = sec.ownerDocument.querySelectorAll(".hrow input"); ins[ins.length - 1].focus();
+  }));
+}
+
+// plain-language names for the boxes of the fixed lines; [label, hint]
+const FIELD_HELP = {
+  d2: ["接单/出货系统还没更新的", "按这三项写：已接单未入系统 / 已接单未交接后道 / 已出货未更新系统（客户/款数/数量，原因，计划日期）"],
+  d3: ["手上要下样、还没下样的款", "款数：哪个客户几款，打算怎么办 + 计划日期"],
+  d4: ["今天的客户投诉", "/条数, 知会QC/QA：条数；阿文确认收到：条数"],
+  w1: ["本周工厂意见/投诉"], w2: ["本周搜款推客", "/几个客 客户/款数，下周计划"], w3: ["本周来联系我们的C2C3C4客/新客"],
+  w4a: ["C1客户数（系统里）"], w4b: ["C2客户数（系统里）"], w4c: ["与系统客户总表校对", "接在后面，如 ；与系统客户总表校对时点：1017/14:30完成"],
+  w5: ["未结账务"], w6: ["已投产欠包装", "款数，如 款1"], w7: ["测试未过", "款数，如 款1"],
+  w8a: ["进度核对 条数"], w8b: ["船期预警 条数"], w9: ["品质关注点", "如 需关注点2"],
+  w10a: ["待开客户会议/来访", "如 客1"], w10b: ["会议后面的内容", "如 ，系统客户来访待开会议数1；系统更新自评：5"],
+  w11: ["本周入系统订单款数"], w12: ["系统在手设计稿-业务模块"], w13: ["本周下样数"], w14: ["未完试样单数"],
+  w15a: ["本周超30天样单数"], w15b: ["本周本人做了哪些推动工作/自评"],
+};
+let EXAMPLE = null;   // the template's example values, shown in empty boxes
+function specFields(sec, spec) {
+  EXAMPLE ||= seed().f;
+  const g = el("div", "fgroup");
+  spec.filter(p => p.f).forEach(p => {
+    const [label, hint] = FIELD_HELP[p.f] || [p.f];
+    const prev = S.prev && S.prev.f && S.prev.f[p.f];
+    const f = el("label", "field"); f.append(el("span", "flabel", label));
+    const box = textBox(() => S.f[p.f] || "", v => { S.f[p.f] = v; }, prev ? "上次：" + prev : "例：" + (EXAMPLE[p.f] || ""), true);
+    refreshers.push(() => box.classList.toggle("bad", !(S.f[p.f] || "").trim()));
+    f.append(box);
+    if (prev) {
+      const same = el("button", "same", "用上次的");
+      same.addEventListener("click", e => { e.preventDefault(); S.f[p.f] = prev; box.value = prev; box.dispatchEvent(new Event("input")); });
+      f.append(same);
+    }
+    if (hint) f.append(el("span", "hint", hint));
+    g.append(f);
+  });
+  const out = el("div", "fout"); out.append("→ ", calc(() => specText(spec).t)); g.append(out);
+  sec.append(g);
+}
+
+// one tracked item (持续关注, client, reminder)
+function itemCard(list, x, withCat) {
+  const card = el("div", "icard");
+  const touch = () => { x.edited = today(); };
+  const top = el("div", "irow");
+  if (withCat) {
+    const sel = el("select"); CATS.forEach(c => opt(sel, c, c || "其他")); sel.value = x.cat;
+    sel.addEventListener("change", () => { x.cat = sel.value; touch(); changed(); });
+    top.append(sel);
+  }
+  const text = textBox(() => x.text, v => { x.text = v; touch(); }, "发生了什么、做了什么、打算怎么办", true);
+  top.append(text);
+  const bottom = el("div", "irow small");
+  const start = el("input", "short"); start.value = x.start; start.title = "入日志的日期（MMDD），或 W43 这样的周数";
+  start.addEventListener("input", () => { x.start = start.value.trim(); touch(); changed(); });
+  const plan = el("input"); plan.type = "date";
+  const tomorrow = new Date(DAY); tomorrow.setDate(tomorrow.getDate() + 1); plan.min = iso(tomorrow);
+  const pd = mmddToDate(x.plan, DAY); if (pd) plan.value = iso(pd);
+  plan.addEventListener("change", () => { if (plan.value) { x.plan = mmdd(fromIso(plan.value)); x.closed = ""; touch(); changed(); } });
+  const upd = el("button", "", "今日更新");
+  upd.title = "在后面加上今天的日期，接着写今天做了什么";
+  upd.addEventListener("click", () => {
+    if (!x.text.includes(T())) { x.text = x.text.replace(/[，,\s]+$/, "") + "，" + T(); text.value = x.text; }
+    touch(); changed(); text.focus(); text.setSelectionRange(text.value.length, text.value.length); text.dispatchEvent(new Event("input"));
+  });
+  const end = el("button", "", x.plan === "X" ? "恢复" : "结束");
+  end.title = "结束 = 计划日期写 X，明天自动从日志删除";
+  end.addEventListener("click", () => {
+    if (x.plan === "X") { x.plan = ""; x.closed = ""; } else { x.plan = "X"; x.closed = today(); }
+    touch(); renderForm(); changed();
+  });
+  const del = el("button", "", "删除");
+  del.addEventListener("click", () => { if (confirm("删除这一条？")) { list.splice(list.indexOf(x), 1); renderForm(); changed(); } });
+  const state = calc(() => x.plan === "X" ? "已结束（明天从日志删除）" : x.edited === today() ? "今天改过 → +" : "今天没改 → -");
+  bottom.append("入日志 ", start, "　计划 ", x.plan === "X" ? el("b", "", "X") : plan, " ", upd, end, del, "　", state);
+  card.append(top, bottom);
+  refreshers.push(() => { card.classList.toggle("bad", !!itemBad(x)); card.classList.toggle("closed", x.plan === "X"); });
+  return card;
+}
+function itemList(sec, list, withCat) {
+  list.filter(alive).forEach(x => sec.append(itemCard(list, x, withCat)));
+  sec.append(addButton("新事项", () => { list.push(it(T(), "", "", "", true)); renderForm(); changed(); const ts = sec.querySelectorAll(".icard textarea"); ts[ts.length - 1].focus(); }));
+}
+
+function clientsSection() {
+  const sec = section("C1有单老客", "每个客户：简称（4位）、前道/后道，每条产品线写各业务年度数量，下面加跟踪事项（前道每条产品线至少一条）。");
+  S.clients.forEach(c => {
+    const card = el("div", "ccard");
+    const head = el("div", "irow");
+    const name = el("input", "short"); name.value = c.name; name.placeholder = "简称";
+    name.addEventListener("input", () => { c.name = name.value.trim(); changed(); });
+    const role = el("select"); [["前", "前道"], ["前后", "前后道"], ["后", "后道"]].forEach(([v, t]) => opt(role, v, t)); role.value = c.role;
+    role.addEventListener("change", () => { c.role = role.value; changed(); });
+    const delC = el("button", "", "删除客户");
+    delC.addEventListener("click", () => { if (confirm("删除客户 " + c.name + "？")) { S.clients.splice(S.clients.indexOf(c), 1); renderForm(); changed(); } });
+    head.append(el("b", "", "客户 "), name, role, delC);
+    card.append(head);
+    c.lines.forEach((l, i) => {
+      const pl = el("div", "pline");
+      const r1 = el("div", "irow");
+      const prod = el("input", "short"); prod.value = l.product; prod.placeholder = "产品线";
+      prod.addEventListener("input", () => { l.product = prod.value.trim(); changed(); });
+      const qty = textBox(() => l.qty, v => { l.qty = v; }, "各业务年度数量，如 224单3000双；225单2000双，估4000双", false);
+      qty.classList.add("grow");
+      r1.append(prod, qty);
+      if (c.lines.length > 1) { const d = el("button", "", "删除产品线"); d.addEventListener("click", () => { if (confirm("删除这条产品线？")) { c.lines.splice(i, 1); renderForm(); changed(); } }); r1.append(d); }
+      pl.append(r1);
+      itemList(pl, l.items, false);
+      card.append(pl);
+    });
+    card.append(addButton("产品线", () => { c.lines.push({ product: "", qty: "", items: [] }); renderForm(); changed(); }));
+    sec.append(card);
+  });
+  sec.append(addButton("客户", () => { S.clients.push({ name: "", role: "前", lines: [{ product: "", qty: "", items: [] }] }); renderForm(); changed(); }));
+}
+
+function renderForm() {
+  const y = window.scrollY;
+  refreshers = []; form.innerHTML = "";
+  hoursSection();
+
+  const daily = section("今天的数字", "每天早上会清空，灰色字是上次写的。");
+  const auto = el("div", "fout"); auto.append("组内日常清单表（从日常清单自动来）→ ", calc(() => specText(DAILY[0]).t)); daily.append(auto);
+  DAILY.slice(1).forEach(sp => specFields(daily, sp));
+
+  itemList(section("持续关注", "客诉、欠包装、测试未过、进度核对、船期预警、品质、会议等要跟踪的事。每条都要有计划日期（晚于今天）；今天改过的自动变 +。"), S.focus, true);
+  clientsSection();
+  itemList(section("C1无单老客 / C1新客", "以前下过单但近两年没单的客人，或新客。一旦下单，移到 C1有单老客。"), S.c1none, false);
+  itemList(section("C2目标客"), S.c2, false);
+  itemList(section("提醒", "如 W43 周一传未完日常清单表；新的一周第一天会自动换成新的周数。"), S.remind, false);
+
+  const wk = el("details", "fsec"); wk.open = DAY.getDay() === 5;
+  const sum = el("summary"); sum.append(el("b", "", "每周回顾"), "　上次更新 ", calc(() => mmdd(fromIso(S.weekDate))), "，每周五自动清空重写");
+  wk.append(sum); form.append(wk);
+  WEEKLY.forEach(sp => { const g = el("div", "wgroup"); g.append(el("div", "wtitle", sp[0].replace(/^\*|：$/g, ""))); specFields(g, sp); wk.append(g); });
+
+  refresh();
+  window.scrollTo(0, y);
+}
+
+function render() {
+  newDay();
+  // drop items closed with X before today (rule 5)
+  ["remind", "focus", "c1none", "c2"].forEach(k => { S[k] = S[k].filter(alive); });
+  S.clients.forEach(c => c.lines.forEach(l => { l.items = l.items.filter(alive); }));
+  migrateHours();
+  renderForm();
+  save();
+}
+
+function refresh() { refreshers.forEach(r => r()); renderPreview(); }
+let saveTimer;
+function changed() { refresh(); clearTimeout(saveTimer); saveTimer = setTimeout(save, 300); }
+
+async function copyText(t) {
+  try { await navigator.clipboard.writeText(t); return true; } catch (e) {}
+  const ta = el("textarea"); ta.value = t; document.body.append(ta); ta.select();
+  const ok = document.execCommand("copy"); ta.remove(); return ok;
+}
+
+// ---------- reading an existing journal (pasted text) ----------
+// Tolerant: spaces, half/full-width punctuation and a missing category don't matter.
+// Lines it can't place are listed, nothing is guessed.
+const PUNCT = { "：": ":", "，": ",", "；": ";", "（": "(", "）": ")", "／": "/" };
+function litRe(s) {
+  return [...s.replace(/\s+/g, "")].map(ch => {
+    const alt = PUNCT[ch] || Object.keys(PUNCT).find(k => PUNCT[k] === ch);
+    return alt ? "[" + ch + alt + "]" : ch.replace(/[.*+?^${}()|[\]\\\/-]/g, "\\$&");
+  }).join("\\s*");
+}
+function specRe(spec) {
+  return new RegExp("^" + spec.map(p => typeof p === "string" ? litRe(p) : p.f ? "(.*?)" : p.c ? ".*?" : "\\s*\\d{4}\\s*").join("") + "\\s*$");
+}
+function parseItem(t, withCat) {
+  const m = t.match(/^[+\-－–—]\s*(W\d+|M\d+|\d{4})?\s*(.*?)\s*(\d{4}|[Xx])?\s*$/);
+  if (!m) return null;
+  let cat = "", text = m[2];
+  if (withCat) {
+    const c = text.match(new RegExp("^(" + CATS.slice(1).join("|") + ")\\s*[：:]\\s*"));
+    if (c) { cat = c[1]; text = text.slice(c[0].length); }
+  }
+  const plan = (m[3] || "").toUpperCase();
+  return { start: m[1] || "", cat, text, plan, edited: "", closed: plan === "X" ? today() : "" };
+}
+function parseJournal(raw) {
+  const s = blank(), missed = [];
+  let sec = "", client = null, pl = null, read = 0;
+  const lines = raw.split(/\r?\n/).map(l => l.replace(/\s+$/, "")).filter(l => l.trim());
+  for (let t of lines) {
+    t = t.trim();
+    if (/^(规则|备忘|●备忘)|^——/.test(t) || /^●\s*备忘/.test(t)) { if (/规则/.test(t)) break; sec = "skip"; continue; }
+    if (/^-{5,}/.test(t)) continue;
+    if (/^\d*\s*@/.test(t)) {
+      const rest = t.replace(/^\d*\s*@\s*/, "");
+      if (rest.startsWith("总计")) { read++; continue; }
+      const k = HOUR_LABELS.findIndex(l => rest.startsWith(l));
+      const m = k >= 0 && rest.slice(HOUR_LABELS[k].length).match(/^\s*([^（(]*?)\s*(?:[（(](.*)[）)])?\s*$/);
+      if (m && parseHours(m[1])) { s.hours[k].h = tidyHours(m[1]); s.hours[k].note = (m[2] || "").trim(); read++; } else missed.push(t);
+      continue;
+    }
+    if (/^▲\s*每日回顾/.test(t)) { sec = "daily"; read++; continue; }
+    if (/^▲\s*提醒/.test(t)) { sec = "remind"; read++; continue; }
+    if (/^▲\s*持续关注/.test(t)) { sec = "focus"; read++; continue; }
+    if (/^●●\s*每周回顾/.test(t)) {
+      sec = "weekly"; read++;
+      const m = t.match(/(\d{4})\s*更新/); const d = m && mmddToDate(m[1], DAY); if (d) s.weekDate = iso(d);
+      continue;
+    }
+    if (/^●\s*C1\s*有单老客/.test(t)) { sec = "clients"; read++; continue; }
+    if (/^●\s*C1\s*无单老客/.test(t)) { sec = "c1none"; read++; continue; }
+    if (/^●\s*C2\s*目标客/.test(t)) { sec = "c2"; read++; continue; }
+    if (sec === "skip") continue;
+    if (sec === "daily" || sec === "weekly") {
+      const spec = (sec === "daily" ? DAILY : WEEKLY).find(sp => specRe(sp).test(t));
+      if (!spec) { missed.push(t); continue; }
+      const vals = t.match(specRe(spec)).slice(1);
+      spec.filter(p => p.f).forEach((p, i) => { s.f[p.f] = vals[i].trim(); });
+      read++; continue;
+    }
+    if (/^[+\-－–—]/.test(t)) {
+      const x = parseItem(t, sec === "focus");
+      const list = sec === "remind" ? s.remind : sec === "focus" ? s.focus : sec === "c1none" ? s.c1none : sec === "c2" ? s.c2 : pl && pl.items;
+      if (x && list) { list.push(x); read++; } else missed.push(t);
+      continue;
+    }
+    if (sec === "clients") {
+      const h = t.match(/^([A-Za-z0-9]+)\s*(前后|前|后)\s*(.*)$/);
+      if (h) { client = { name: h[1], role: h[2], lines: [] }; s.clients.push(client); pl = { product: h[3], qty: "", items: [] }; client.lines.push(pl); read++; continue; }
+      if (client && pl && !pl.qty && !pl.items.length) { pl.qty = t; read++; continue; }
+      if (client) { pl = { product: t, qty: "", items: [] }; client.lines.push(pl); read++; continue; }
+    }
+    missed.push(t);
+  }
+  return { s, missed, read };
+}
+
+// ---------- toolbar ----------
+const dayInput = document.getElementById("day");
+dayInput.value = today();
+dayInput.addEventListener("change", () => { if (!dayInput.value) return; DAY = fromIso(dayInput.value); render(); });
+
+document.getElementById("copy").addEventListener("click", async () => {
+  save();
+  const bad = genLines().filter(l => l.bad).length;
+  const ok = await copyText(journalText());
+  toast(ok ? (bad ? "已复制。注意：有 " + bad + " 行还没填好（红色）" : "已复制，可以粘贴了") : "复制失败，请用 以前的日志 里的文字");
+});
+
+document.getElementById("week").addEventListener("click", () => {
+  S.weekDate = today(); render(); toast("每周回顾的日期和统计已更新到 " + T());
+});
+
+const histDlg = document.getElementById("histDlg"), histSel = document.getElementById("histSel"), histText = document.getElementById("histText");
+document.getElementById("hist").addEventListener("click", () => {
+  const days = Object.keys(S.archive).sort().reverse();
+  if (!days.length) { toast("还没有以前的日志"); return; }
+  histSel.innerHTML = ""; days.forEach(d => histSel.append(Object.assign(el("option", "", d), { value: d })));
+  histText.value = S.archive[days[0]]; histDlg.showModal();
+});
+histSel.addEventListener("change", () => { histText.value = S.archive[histSel.value]; });
+document.getElementById("histClose").addEventListener("click", () => histDlg.close());
+
+const impDlg = document.getElementById("impDlg"), impText = document.getElementById("impText"),
+  impResult = document.getElementById("impResult"), impDo = document.getElementById("impDo");
+let parsed = null;
+document.getElementById("imp").addEventListener("click", () => { impResult.textContent = ""; impDo.disabled = true; impDlg.showModal(); });
+document.getElementById("impClose").addEventListener("click", () => impDlg.close());
+document.getElementById("impCheck").addEventListener("click", () => {
+  parsed = parseJournal(impText.value);
+  impResult.textContent = "读懂了 " + parsed.read + " 行。" +
+    (parsed.missed.length ? "\n下面 " + parsed.missed.length + " 行没读懂，导入后不会出现，请在文字里改好再检查，或导入后手动加：\n" + parsed.missed.join("\n") : "全部读懂。");
+  impDo.disabled = parsed.read === 0;
+});
+impDo.addEventListener("click", () => {
+  if (!parsed || !confirm("用这份日志替换页面上现在的内容？")) return;
+  const keep = { archive: S.archive, todo: S.todo }; S = parsed.s; Object.assign(S, keep);
+  S.prev = { f: { ...S.f }, hours: S.hours.map(h => ({ ...h })) };
+  impDlg.close(); render(); toast("已导入");
+});
+
+document.getElementById("export").addEventListener("click", () => {
+  const a = el("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify(S, null, 1)], { type: "application/json" }));
+  a.download = "日志备份-" + today() + ".json"; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+});
+document.getElementById("import").addEventListener("change", async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try { const d = JSON.parse(await f.text()); if (!d.hours || !d.focus) throw 0;
+    if (!confirm("用备份文件替换现在的日志？")) return; S = d; render(); toast("已恢复");
+  } catch (err) { toast("这个文件不是日志备份"); }
+  e.target.value = "";
+});
+
+// the group's own example journal and rules, as written in the Word template
+const SAMPLE = "1@邮件回复 1h（MDC，TTT为主）\n@立项开发 1.5h（淘图0.5，整理集体图0.5，下样单0.5） \n@搜款推客0.5h (给HKM挑推30款0.5)\n@其他开发 1.5h+（找温州小凉鞋新工厂0.25,下样TRT 0.25，催样1+）\n@定单相关 1h-（MDC条码处理 0.5-， TTS货期沟通0.5）\n@单据 0.5h（TRT）\n@整样 0.5h（LFGW）\n@其他事务 0.75h (日志0.25，做卫生0.5)\n@总计7.25h+\n▲每日回顾：\n*组内日常清单表：1023当天接收4，当天完成3，未结2，传递：17：50已传\n*接单/出货系统更新：1023已接单未入系统：AAA/2款0.6W啥原因1029（仅前道业务）；已接单未交接后道：AAA/2款/客已下单2天（仅前道业务）；已出货未更新系统：AAA/2.5W 1029（仅后道业务）\n*在手需下样还未下样款数：1023款2：AAA款1，ABC款1，打算如何1029\n*客户投诉：1023/1条, 知会QC/QA：1条；阿文确认收到：1条，今入持续关注区登记客诉：1条\n▲提醒：本周第43周\n-W43周一传未完日常清单表，1020已传（或：1020无未完记录），下周1027\n▲持续关注(客户工厂投诉/欠包装/测试未过/进度核对/船期预警/品质难点/会议/其他等跟踪)：\n-1021客诉：某客投诉某事，已知会QC/QA，阿文已确认收到，1022如何如何1029\n+1023客诉：AAA如何如何，已知会QC/QA，阿文已确认收到1027\n+1023欠包装：AAA某厂1款，如何如何1030\n-1020测试未过：AAA某厂1款，如何如何1030\n-1017进度核对：ABC进度表发哪些QC，进度目前没有问题1024\n-1017进度核对：DDD进度表发哪些QC，进度目前没有问题1024\n-1020船期预警：ABC某某厂1W双客期1115交，1022做了啥，打算如何1029\n-1017品质：BBB某厂某材质，1021如何，1022如何1030\n+1020品质：某厂某材质如何，1023如何1028\n-0913会议：ABC某日来访，1020打算如何1029\n+1013会议：DDD10月23日15:00会议，1023如何如何X\n-1014某事如何，1022如何1029\n--------------------------------------------------------------------------------------\n●●每周回顾：以下统计值每周5更新：1017更新\n*本周工厂意见/投诉：1017投诉2，某厂投诉如何如何，某某厂投诉如何如何\n*本周搜款推客：1017/2客AAA/22款，BBB/50款，下周计划：1客CEC1024（仅前道业务）\n*本周来联系我们C2C3C4客/新客数：1017/2客，激活：1/某国DDD，新入系统：1/某国CENTE；系统更新自评：5（仅前道业务）\n*负责C1C2客户数：1017 C1日志4系统4, C2日志1系统1；与系统客户总表校对时点：1017/14:30完成（仅前道业务）\n*未结账务：1017如何如何\n*已投产欠包装：1017款1，持续关注区登记欠包装：1\n*测试未过：1017款1，持续关注区登记：1\n*进度核对/船期预警：1017进度核对2，船期预警1；持续关注区登记：进度核对2船期预警1\n*品质关注点：1017需关注点2，持续关注区登记品质：2\n*待开客户会议/来访：1017客1，持续关注区登记会议：1，系统客户来访待开会议数1；系统更新自评：5\n*本周入系统订单款数：1017款5，最久在手工作天数1天，入系统速度自评：5（）\n*系统在手设计稿-业务模块：1017已通过未下样数2，下样推进时效自评：4（如何如何）（仅有立项业务）\n*本周下样数：1017样3，最久在手工作天数1天，下样速度自评：5（）\n*未完试样单数：1017单3，无需试样备注描述合规自评：5\n*本周超30天样单数：1017：1单，上周2单；本周最久已下样119天；本周本人做了哪些推动工作/自评：1017如何如何/自评：4.5\n●C1有单老客：3客\nABC1前 鞋1 \n224单80532双；225单3000双，226单5000双，估105000双\n+1017啥事，1023做了啥，打算如何1028\n鞋2\n224单0双；225单8532双，估21300双\n-1010男段3款，1021如何，如何1030\n+1010女段2款，1023如何，如何1029\nABCM前后 鞋1 \n224单3000双；225单2000双，未出0双，226单3000双，估4000双\n-1017 如何如何，1021如何如何1030\nBBB后 鞋1\n225未出3000双\n+1023如何如何1029\n●C1无单老客/C1新客：1客\n-0430（英国FGD前）如何，0725寄样，0920如何如何1024\n●C2目标客：1客\n-0220（德国ADG）如何，0230如何，0630如何如何1110\n-----------------------------------------------------\n●备忘：\n*日常清单表：若有新的记录生成或有记录完成了，需当天传递；\n*日常清单表：若有未完成的记录，无论有无更新，每周一传递；\n\n————————————————————————————————————————\n规则：\n1)\t@开头9行为固化格式为当日工时分布登记及汇总。若有工时数值产生，需在（）内简注事类；若有多项事类，请注明每项时间。\n2）= 后面跟的日期都是每周回顾日期，事项末尾无需计划日期。\n3）# 为分类汇总符号，#后面日期为汇总统计日期，事项末尾无需计划日期。\n4) –后面跟的只有3种情况：A) 周缩写加周数，如“W11”，B)月缩写加月数，如“M12”，C）4位数值登记日期，该日期都是事项入日志那一天的日期，该事项未打x移除前，此开头日期都不改。\n5）–开头事项在事项末尾都需注明计划日期（该日期不是过去日期，也不是日志当天日期），直至事项末尾打X结束移除出日志为止。若不是刚入日志的事项，跟踪事项通常体现3个日期，除了开头和结尾各一个，中间还需一个登记最新操作的那个日期；-号开头的跟踪事项若当天有更新，需将-号改为+号；第二天若+号开头的记录若无继续更新，需将+号改为-号。\n6)\t持续关注区内与客诉/欠包装/测试未过/进度核对/船期预警/品质/会议相关记录都需在开头日期码后面加“类别：”标注，如：-1124客诉：某客如何如何1130\n7）若一个顶级客人下有多个不同简称客人，该客人所有简称都须用4位简称。\n8）已接单未入系统栏登记的订单都需是有具体数量的订单，无明确数量的订单预告不在此栏体现。\n9）界面整齐简洁，减少所有不必要的空格和空行。\n10) C1有单老客日志登记上一业务年度，当前业务年度和下一业务年度订单数值，若下一业务年度无订单数值，不用显示该业务年度信息。日志上的预估数量都是预估当前业务年度的未下单数量。每10月31日进入新的业务年度时，需将前前业务年度订单信息删除，如进入224业务年度，需将222业务年度订单信息删除。\n11）C1有单老客区：所有客户都需从“前/前后/后”这3个选项中选一个标注在客户简称后面，标前或前后的客户需做数量预估；带后的客户需统计本年度未出数量。\n12）C1无单老客/C1新客区：所有客户都需从“前/前后/后”这3个选项中选一个标注在客户简称后面。\n13）C1无单老客指以前下过订单，但当前业务年度和上一业务年度无订单的客人；C1无单老客或C1新客一旦下单，该客户记录就需移到C1有单老客区。\n14）C1有单老客区，前道业务负责每个客人每个产品线名下需至少有一条跟踪记录来登记与该客人该产品线的互动进展及计划情况。";
+document.getElementById("sample").addEventListener("click", () => { document.getElementById("sampleText").value = SAMPLE; document.getElementById("sampleDlg").showModal(); });
+document.getElementById("sampleClose").addEventListener("click", () => document.getElementById("sampleDlg").close());
+
+let toastTimer;
+function toast(t) { const n = document.getElementById("toast"); n.textContent = t; n.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(() => n.classList.remove("show"), 2600); }
+function msg(t, bad) { const m = document.getElementById("msg"); m.textContent = t; m.classList.toggle("bad", !!bad); }
+
+document.getElementById("rules").textContent = `1) @开头9行为固化格式为当日工时分布登记及汇总。若有工时数值产生，需在（）内简注事类；若有多项事类，请注明每项时间。
+2）= 后面跟的日期都是每周回顾日期，事项末尾无需计划日期。
+3）# 为分类汇总符号，#后面日期为汇总统计日期，事项末尾无需计划日期。
+4) –后面跟的只有3种情况：A) 周缩写加周数，如“W11”，B)月缩写加月数，如“M12”，C）4位数值登记日期，该日期都是事项入日志那一天的日期，该事项未打x移除前，此开头日期都不改。
+5）–开头事项在事项末尾都需注明计划日期（该日期不是过去日期，也不是日志当天日期），直至事项末尾打X结束移除出日志为止。若不是刚入日志的事项，跟踪事项通常体现3个日期，除了开头和结尾各一个，中间还需一个登记最新操作的那个日期；-号开头的跟踪事项若当天有更新，需将-号改为+号；第二天若+号开头的记录若无继续更新，需将+号改为-号。
+6) 持续关注区内与客诉/欠包装/测试未过/进度核对/船期预警/品质/会议相关记录都需在开头日期码后面加“类别：”标注，如：-1124客诉：某客如何如何1130
+7）若一个顶级客人下有多个不同简称客人，该客人所有简称都须用4位简称。
+8）已接单未入系统栏登记的订单都需是有具体数量的订单，无明确数量的订单预告不在此栏体现。
+9）界面整齐简洁，减少所有不必要的空格和空行。
+10) C1有单老客日志登记上一业务年度，当前业务年度和下一业务年度订单数值，若下一业务年度无订单数值，不用显示该业务年度信息。日志上的预估数量都是预估当前业务年度的未下单数量。每10月31日进入新的业务年度时，需将前前业务年度订单信息删除。
+11）C1有单老客区：所有客户都需从“前/前后/后”这3个选项中选一个标注在客户简称后面，标前或前后的客户需做数量预估；带后的客户需统计本年度未出数量。
+12）C1无单老客/C1新客区：所有客户都需从“前/前后/后”这3个选项中选一个标注在客户简称后面。
+13）C1无单老客指以前下过订单，但当前业务年度和上一业务年度无订单的客人；C1无单老客或C1新客一旦下单，该客户记录就需移到C1有单老客区。
+14）C1有单老客区，前道业务负责每个客人每个产品线名下需至少有一条跟踪记录来登记与该客人该产品线的互动进展及计划情况。`;
+
+</script>
+<script>
+// the 日常清单 Excel layout used until you import your own file (example rows and pictures removed)
+const DEFAULT_XLSX = "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";
+</script>
+<script>
+"use strict";
+// ---------- 日常清单: the coded to-do list from the bosses ----------
+// A code is MMDD + letter + "-" + the day's number, anywhere in the message: 1019G-02, 1019-02.
+// The letter says who sent it. These are group B01's letters (other groups may differ): change only this table.
+// sheet = which 01 sheet of the Excel; row = which 02新增统计 row counts it.
+const SOURCES = {
+  "":  { name: "大老板",   sheet: "indirect", row: "B1" },
+  "G": { name: "大老板",   sheet: "indirect", row: "B1" },
+  "A": { name: "组长",     sheet: "direct",   row: "A1" },
+  "Z": { name: "全组通知", sheet: "direct",   row: "A2" },
+  "X": { name: "小组通知", sheet: "direct",   row: "A3" },
+};
+const CODE_FIND = /(\d{4})([A-Za-z]?)-(\d{1,3})(?!\d)/g;
+const CODE_RE = /^(\d{4})([A-Z]?)-(\d{1,3})$/;
+const STAT_ROWS = [["A1", "A来自直接上级-单独通知"], ["A2", "A来自直接上级-全组大群通知"], ["A3", "A来自直接上级-组内组小群通知"], ["A", "A来自直接上级-汇总"],
+  ["B1", "B来自间接上级-单独通知"], ["B2", "B来自间接上级-全组大群通知"], ["B3", "B来自间接上级-组内组小群通知"], ["B", "B来自间接上级-汇总"]];
+const WORKDAYS = [1, 2, 3, 4, 5, 6];   // Mon..Sat get a number in 02新增统计 (0 when nothing came in)
+const TEMPLATE_KEY = "journal-xlsx-template";
+
+// which 01 sheet an item goes on: the sheet it was imported from, else by its letter
+function sheetOf(x) { return x.sheet || (source(x.code) || {}).sheet || "direct"; }
+function TD() {
+  if (!S.todo) S.todo = { items: [], sends: [], statsBase: {} };
+  // file name = your own part (editable) + "-" + today's date, e.g. 日常清单-B01组-15.Arthur-20261019.xlsx
+  if (S.todo.fileBase == null) S.todo.fileBase = S.todo.team && S.todo.name ? `日常清单-${S.todo.team}-${S.todo.name}` : "日常清单-B01组-姓名";
+  return S.todo;
+}
+const fileDate = () => DAY.getFullYear() + T();
+const fileName = () => TD().fileBase.trim() + "-" + fileDate() + ".xlsx";
+function source(code) { const m = (code || "").match(CODE_RE); return m ? SOURCES[m[2]] : null; }
+function noteLines(x) { return x.notes.split("\n").map(l => l.trim()).filter(Boolean); }
+// 须知 5: OK = last note line ends with X; G = a note line starts with today's date; otherwise empty
+function status(x) {
+  const ls = noteLines(x);
+  if (ls.length && /[Xx]$/.test(ls[ls.length - 1])) return "OK";
+  return ls.some(l => l.startsWith(T())) ? "G" : "";
+}
+function planOf(x) { const ls = noteLines(x); const m = ls.length && ls[ls.length - 1].match(/(\d{4})$/); return m ? m[1] : ""; }
+function syncOk(x) { const ok = status(x) === "OK"; if (ok && !x.xDate) x.xDate = today(); if (!ok) x.xDate = ""; }
+// MMDD -> the latest such date on or before ref (a code is never from the future)
+function pastDate(md, ref) {
+  if (!/^\d{4}$/.test(md)) return null;
+  let d = new Date(ref.getFullYear(), +md.slice(0, 2) - 1, +md.slice(2));
+  if (d.getMonth() !== +md.slice(0, 2) - 1) return null;
+  if (d > ref) d = new Date(ref.getFullYear() - 1, +md.slice(0, 2) - 1, +md.slice(2));
+  return d;
+}
+function codeDate(x) { return pastDate(x.code.slice(0, 4), fromIso(x.got || today())); }
+function problems(x) {
+  const p = [];
+  if (!source(x.code)) p.push("编码格式不对（如 1019G-02）");
+  if (!x.desc.trim()) p.push("没有描述");
+  if (noteLines(x).some(l => !/^\d{4}/.test(l))) p.push("备注每行要以日期开头");
+  if (status(x) !== "OK") { const d = mmddToDate(planOf(x), DAY); if (!d || d <= DAY) p.push("最后一行末尾要写计划日期（晚于今天）"); }
+  return p;
+}
+// numbers for the journal's 组内日常清单表 line
+function todoCount(k) {
+  const it = TD().items;
+  if (k === "tdIn") return it.filter(x => x.got === today()).length;
+  if (k === "tdDone") return it.filter(x => x.xDate === today()).length;
+  if (k === "tdOpen") return it.filter(x => status(x) !== "OK").length;
+  const s = TD().sends.filter(s => s.day === today());
+  return s.length ? s[s.length - 1].time.replace(":", "：") + "已传" : "未传";
+}
+
+// ---------- pasting boss messages ----------
+// Every line holding a code starts a new item; lines before/after belong to the item above.
+function parseMessages(text) {
+  const out = []; let cur = null;
+  text.split(/\r?\n/).forEach(l => {
+    const s = l.trim(); if (!s) return;
+    const codes = [...s.matchAll(CODE_FIND)];
+    if (codes.length) {
+      const m = codes[0];
+      cur = { code: m[1] + m[2].toUpperCase() + "-" + m[3].padStart(2, "0"),
+        desc: s.replace(m[0], "").replace(/^[\s:：,，、.。]+|[\s:：,，、]+$/g, "").replace(/[（(]\s*[）)]/g, "").replace(/\s{2,}/g, " ") };
+      out.push(cur);
+    } else if (cur) cur.desc += (cur.desc ? " " : "") + s;
+    else out.push(cur = { code: "", desc: s });
+  });
+  return out;
+}
+
+// ---------- the to-do tab ----------
+const todoEl = document.getElementById("todo");
+let showSent = false;
+function renderTodo() {
+  const td = TD(); todoEl.innerHTML = "";
+  const head = el("div", "todohead");
+  const fn = el("span", "fname"); fn.contentEditable = "plaintext-only"; fn.textContent = td.fileBase; fn.dataset.ph = "日常清单-组-姓名";
+  fn.title = "文件名（可以改）；后面的日期每天自动更新";
+  fn.addEventListener("input", () => { td.fileBase = fn.textContent.replace(/[\\/:*?"<>|\n]/g, ""); clearTimeout(saveTimer); saveTimer = setTimeout(save, 300); });
+  fn.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); fn.blur(); } });
+  head.append("文件名 ", fn, el("span", "calc", "-" + fileDate() + ".xlsx"));
+  const counts = el("span", "legend"); counts.id = "todoCounts"; head.append(counts); showCounts();
+  const cb = el("label", "legend"); const c = el("input"); c.type = "checkbox"; c.checked = showSent;
+  c.addEventListener("change", () => { showSent = c.checked; renderTodo(); }); cb.append(c, " 显示已传的已收官记录"); head.append(cb);
+  todoEl.append(head);
+
+  const add = el("div", "addbox");
+  const ta = el("textarea"); ta.placeholder = "把上级带编码的消息粘贴到这里（可以一次贴几条），编码在哪个位置都可以，如 1019G-02";
+  const b = el("button", "main", "加入清单");
+  b.addEventListener("click", () => {
+    const msgs = parseMessages(ta.value); let added = 0, dup = [];
+    msgs.forEach(m => {
+      if (m.code && td.items.some(x => x.code === m.code)) { dup.push(m.code); return; }
+      td.items.push({ code: m.code, desc: m.desc, notes: T(), xDate: "", sent: 0, okSent: false, got: today() }); added++;
+    });
+    ta.value = ""; save(); renderTodo(); refresh();
+    toast("加入 " + added + " 条" + (dup.length ? "；已在清单里：" + dup.join("，") : ""));
+  });
+  add.append(ta, b); todoEl.append(add);
+
+  const list = td.items.filter(x => showSent || !x.sent)
+    .sort((a, b) => (codeDate(a) || 0) - (codeDate(b) || 0) || a.code.localeCompare(b.code));
+  list.forEach(x => todoEl.append(card(x)));
+  if (!list.length) todoEl.append(el("p", "legend", "清单是空的。"));
+}
+function showCounts() {
+  const c = document.getElementById("todoCounts");
+  if (c) c.textContent = `　未结 ${todoCount("tdOpen")} · 今天收到 ${todoCount("tdIn")} · 今天完成 ${todoCount("tdDone")} · 传递：${todoCount("tdSent")}`;
+}
+function card(x) {
+  const td = TD(), box = el("div", "card");
+  const top = el("div", "cardtop");
+  const code = el("span", "code"); code.contentEditable = "plaintext-only"; code.textContent = x.code; code.dataset.ph = "编码";
+  const who = el("span", "chip");
+  const desc = el("span", "desc"); desc.contentEditable = "plaintext-only"; desc.textContent = x.desc; desc.dataset.ph = "描述";
+  const st = el("span", "chip st");
+  const del = ui("删除", () => { if (confirm("删除 " + x.code + "？")) { td.items.splice(td.items.indexOf(x), 1); save(); renderTodo(); refresh(); } });
+  top.append(code, who, desc, st, del);
+  const notes = el("textarea", "notes"); notes.value = x.notes; notes.rows = 1;
+  const btns = el("div", "cardbtns");
+  const upd = el("button", "", "今日更新");
+  const done = el("button", "", "收官 X");
+  const prob = el("span", "prob");
+  btns.append(upd, done, prob);
+  box.append(top, notes, btns);
+
+  const fit = () => { notes.style.height = "auto"; notes.style.height = notes.scrollHeight + 2 + "px"; };
+  const show = () => {
+    const s = source(x.code), stat = status(x);
+    who.textContent = s ? s.name : "?";
+    st.textContent = stat || "未结"; st.dataset.s = stat;
+    const p = problems(x); prob.textContent = p.join("；");
+    box.classList.toggle("bad", p.length > 0); box.classList.toggle("ok", stat === "OK");
+  };
+  const changedItem = () => { syncOk(x); show(); showCounts(); refresh(); clearTimeout(saveTimer); saveTimer = setTimeout(save, 300); };
+  code.addEventListener("input", () => { x.code = code.textContent.trim().toUpperCase(); changedItem(); });
+  desc.addEventListener("input", () => { x.desc = desc.textContent; changedItem(); });
+  [code, desc].forEach(e => e.addEventListener("keydown", ev => { if (ev.key === "Enter") { ev.preventDefault(); e.blur(); } }));
+  notes.addEventListener("input", () => { x.notes = notes.value; fit(); changedItem(); });
+  const appendLine = s => { x.notes = x.notes.replace(/\s+$/, "") + (x.notes.trim() ? "\n" : "") + s; notes.value = x.notes; fit(); changedItem(); };
+  upd.addEventListener("click", () => {
+    const ls = noteLines(x);
+    if (!(ls.length && ls[ls.length - 1] === T())) appendLine(T());
+    notes.focus(); notes.setSelectionRange(notes.value.length, notes.value.length);
+  });
+  done.addEventListener("click", () => {
+    const ls = noteLines(x), last = ls[ls.length - 1] || "";
+    if (/[Xx]$/.test(last)) return;
+    if (last.startsWith(T()) && last.length > 4) { x.notes = x.notes.replace(/\s+$/, "").replace(/\d{4}$/, "") + "。X"; notes.value = x.notes; fit(); changedItem(); }
+    else { if (last === T()) x.notes = x.notes.replace(/\s+$/, "").slice(0, -4).replace(/\s+$/, ""); appendLine(T() + "已处理。X"); }
+    const i = notes.value.lastIndexOf("已处理"); if (i >= 0) { notes.focus(); notes.setSelectionRange(i, i + 3); }
+  });
+  show(); setTimeout(fit);
+  return box;
+}
+
+// ---------- zip (an .xlsx is a zip of XML files); the browser does the compression ----------
+async function pipe(u8, stream) { return new Uint8Array(await new Response(new Blob([u8]).stream().pipeThrough(stream)).arrayBuffer()); }
+async function unzip(buf) {
+  const u8 = new Uint8Array(buf), dv = new DataView(buf);
+  let e = u8.length - 22; while (e >= 0 && dv.getUint32(e, true) !== 0x06054b50) e--;
+  if (e < 0) throw new Error("不是xlsx文件");
+  const n = dv.getUint16(e + 10, true); let p = dv.getUint32(e + 16, true);
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true), nlen = dv.getUint16(p + 28, true),
+      xlen = dv.getUint16(p + 30, true), clen = dv.getUint16(p + 32, true), off = dv.getUint32(p + 42, true);
+    const name = new TextDecoder().decode(u8.subarray(p + 46, p + 46 + nlen));
+    const start = off + 30 + dv.getUint16(off + 26, true) + dv.getUint16(off + 28, true);
+    const raw = u8.subarray(start, start + csize);
+    out.push({ name, data: method === 0 ? raw.slice() : await pipe(raw, new DecompressionStream("deflate-raw")) });
+    p += 46 + nlen + xlen + clen;
+  }
+  return out;
+}
+const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+function crc32(u8) { let c = 0xFFFFFFFF; for (let i = 0; i < u8.length; i++) c = CRC[(c ^ u8[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+async function zip(files) {
+  const parts = [], central = []; let off = 0;
+  for (const f of files) {
+    const name = new TextEncoder().encode(f.name), comp = await pipe(f.data, new CompressionStream("deflate-raw")), crc = crc32(f.data);
+    const h = new DataView(new ArrayBuffer(30));
+    h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x800, true); h.setUint16(8, 8, true); h.setUint16(12, 33, true);
+    h.setUint32(14, crc, true); h.setUint32(18, comp.length, true); h.setUint32(22, f.data.length, true); h.setUint16(26, name.length, true);
+    parts.push(new Uint8Array(h.buffer), name, comp);
+    const c = new DataView(new ArrayBuffer(46));
+    c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint16(8, 0x800, true); c.setUint16(10, 8, true); c.setUint16(14, 33, true);
+    c.setUint32(16, crc, true); c.setUint32(20, comp.length, true); c.setUint32(24, f.data.length, true); c.setUint16(28, name.length, true); c.setUint32(42, off, true);
+    central.push(new Uint8Array(c.buffer), name);
+    off += 30 + name.length + comp.length;
+  }
+  const csize = central.reduce((a, b) => a + b.length, 0), e = new DataView(new ArrayBuffer(22));
+  e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, csize, true); e.setUint32(16, off, true);
+  return new Blob([...parts, ...central, new Uint8Array(e.buffer)], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+}
+
+// ---------- the workbook ----------
+const NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main", RNS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+const xml = s => new DOMParser().parseFromString(s, "application/xml");
+const xmlText = d => new XMLSerializer().serializeToString(d);
+function colNum(ref) { let n = 0; for (const ch of ref.replace(/\d+/g, "")) n = n * 26 + ch.charCodeAt(0) - 64; return n; }
+function colName(n) { let s = ""; while (n) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; }
+function tText(node) {        // text of a shared string / inline string, without the phonetic (rPh) parts
+  let s = ""; node.childNodes.forEach(c => { if (c.localName === "t") s += c.textContent; else if (c.localName === "r") s += tText(c); }); return s;
+}
+function book(files) {
+  const get = n => files.find(f => f.name === n);
+  const text = n => new TextDecoder().decode(get(n).data);
+  const put = (n, s) => { const f = get(n); if (f) f.data = new TextEncoder().encode(s); else files.push({ name: n, data: new TextEncoder().encode(s) }); };
+  const wb = xml(text("xl/workbook.xml")), rels = xml(text("xl/_rels/workbook.xml.rels"));
+  const target = {};
+  [...rels.getElementsByTagName("Relationship")].forEach(r => { target[r.getAttribute("Id")] = "xl/" + r.getAttribute("Target").replace(/^\/?xl\//, ""); });
+  const sheets = [...wb.getElementsByTagName("sheet")].map((s, i) => ({ name: s.getAttribute("name"), file: target[s.getAttributeNS(RNS, "id")], index: i }));
+  const ss = get("xl/sharedStrings.xml") ? [...xml(text("xl/sharedStrings.xml")).getElementsByTagName("si")].map(tText) : [];
+  const find = test => sheets.find(s => test(s.name));
+  return { files, get, text, put, wb, rels, sheets, ss,
+    direct: find(n => n.startsWith("01") && n.includes("直接")), indirect: find(n => n.startsWith("01") && n.includes("间接")), stats: find(n => n.startsWith("02")) };
+}
+function readRows(B, sheet) {
+  const d = xml(B.text(sheet.file)), rows = [];
+  [...d.getElementsByTagName("row")].forEach(r => {
+    const cells = {};
+    [...r.getElementsByTagName("c")].forEach(c => {
+      const t = c.getAttribute("t"), v = c.getElementsByTagName("v")[0], is = c.getElementsByTagName("is")[0];
+      cells[colNum(c.getAttribute("r"))] = t === "s" ? B.ss[+v.textContent] : t === "inlineStr" ? (is ? tText(is) : "") : v ? v.textContent : "";
+    });
+    rows.push({ r: +r.getAttribute("r"), cells });
+  });
+  return rows;
+}
+const serial = isoDay => { const [y, m, d] = isoDay.split("-").map(Number); return (Date.UTC(y, m - 1, d) - Date.UTC(1899, 11, 30)) / 864e5; };
+function serialToIso(v) { const n = parseFloat(v); if (isNaN(n)) return ""; const d = new Date(Date.UTC(1899, 11, 30) + n * 864e5); return iso(new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())); }
+const y2 = y => "2" + String(y % 100).padStart(2, "0");                              // 2024 -> "224"
+const monthCode = d => y2(d.getFullYear()) + String(d.getMonth() + 1).padStart(2, "0");    // -> "22401"
+const bizYear = d => y2(d.getFullYear() + (d.getMonth() >= 10 ? 1 : 0));                    // business year starts in November
+
+function cell(d, ref, s, kind, val) {
+  const c = d.createElementNS(NS, "c"); c.setAttribute("r", ref); if (s) c.setAttribute("s", s);
+  if (kind === "str" && val !== "") {
+    c.setAttribute("t", "inlineStr");
+    const is = d.createElementNS(NS, "is"), t = d.createElementNS(NS, "t");
+    t.setAttributeNS("http://www.w3.org/XML/1998/namespace", "xml:space", "preserve"); t.textContent = val; is.append(t); c.append(is);
+  } else if (kind === "num" && val !== "" && val != null) { const v = d.createElementNS(NS, "v"); v.textContent = val; c.append(v); }
+  else if (kind === "f") { const f = d.createElementNS(NS, "f"); f.textContent = val; c.append(f); }
+  return c;
+}
+function styleMap(row) { const m = {}; if (row) [...row.getElementsByTagName("c")].forEach(c => { m[colNum(c.getAttribute("r"))] = c.getAttribute("s"); }); return m; }
+function colWidths(d) {
+  const w = {}; [...d.getElementsByTagName("col")].forEach(c => { for (let i = +c.getAttribute("min"); i <= Math.min(+c.getAttribute("max"), 60); i++) w[i] = +c.getAttribute("width"); }); return w;
+}
+function textLines(s, width) {   // rough wrapped line count: a Chinese character is 2 width units
+  return s.split("\n").reduce((n, l) => n + Math.max(1, Math.ceil([...l].reduce((a, ch) => a + (ch.charCodeAt(0) > 255 ? 2 : 1), 0) / Math.max(width - 1, 4))), 0);
+}
+function setFilterName(B, sheet, ref) {
+  let dn = B.wb.getElementsByTagName("definedNames")[0];
+  if (!dn) { dn = B.wb.createElementNS(NS, "definedNames"); const after = B.wb.getElementsByTagName("sheets")[0]; after.parentNode.insertBefore(dn, after.nextSibling); }
+  let n = [...dn.getElementsByTagName("definedName")].find(x => x.getAttribute("name") === "_xlnm._FilterDatabase" && x.getAttribute("localSheetId") === String(sheet.index));
+  if (!n) { n = B.wb.createElementNS(NS, "definedName"); n.setAttribute("name", "_xlnm._FilterDatabase"); n.setAttribute("localSheetId", sheet.index); n.setAttribute("hidden", "1"); dn.append(n); }
+  n.textContent = "'" + sheet.name + "'!" + ref.replace(/([A-Z]+)(\d+)/g, "$$$1$$$2");
+}
+const AFTER_FILTER = ["sortState", "dataConsolidate", "customSheetViews", "mergeCells", "phoneticPr", "conditionalFormatting", "dataValidations", "hyperlinks", "printOptions", "pageMargins", "pageSetup", "headerFooter", "drawing", "legacyDrawing", "tableParts", "extLst"];
+
+// one 01日常清单 sheet: header row kept, every item one row, sent ones hidden by the 先前已传 filter
+function fillList(B, sheet, items, base) {
+  const d = xml(base), sd = d.getElementsByTagName("sheetData")[0];
+  const rows = [...sd.getElementsByTagName("row")];
+  const header = rows.find(r => r.getAttribute("r") === "1"), sample = rows.find(r => +r.getAttribute("r") > 1) || header;
+  const st = styleMap(sample), rowS = sample && sample !== header ? sample.getAttribute("s") : null, w = colWidths(d);
+  rows.forEach(r => { if (r !== header) sd.removeChild(r); });
+  items.forEach((x, i) => {
+    const r = i + 2, row = d.createElementNS(NS, "row");
+    row.setAttribute("r", r); row.setAttribute("spans", "1:6");
+    if (rowS) { row.setAttribute("s", rowS); row.setAttribute("customFormat", "1"); }
+    const h = Math.max(textLines(x.code, w[1] || 9), textLines(x.desc, w[2] || 58), textLines(x.notes, w[6] || 37));
+    row.setAttribute("ht", (Math.max(h, 1) * 13.9 + (h > 1 ? 0 : 0)).toFixed(2)); row.setAttribute("customHeight", "1");
+    if (x.sent) row.setAttribute("hidden", "1");
+    row.append(cell(d, "A" + r, st[1], "str", x.code), cell(d, "B" + r, st[2], "str", x.desc), cell(d, "C" + r, st[3], "str", status(x)),
+      cell(d, "D" + r, st[4], "num", x.xDate ? serial(x.xDate) : ""), cell(d, "E" + r, st[5], "num", x.sent ? 1 : ""), cell(d, "F" + r, st[6], "str", x.notes.trim()));
+    sd.append(row);
+  });
+  const ref = "A1:F" + (items.length + 1), ws = d.documentElement;
+  const dim = d.getElementsByTagName("dimension")[0]; if (dim) dim.setAttribute("ref", ref);
+  let af = d.getElementsByTagName("autoFilter")[0];
+  if (!af) {
+    af = d.createElementNS(NS, "autoFilter");
+    const before = [...ws.children].find(c => AFTER_FILTER.includes(c.localName));
+    ws.insertBefore(af, before || null);
+  }
+  af.setAttribute("ref", ref);
+  [...af.getElementsByTagName("filterColumn")].forEach(f => af.removeChild(f));
+  const fc = d.createElementNS(NS, "filterColumn"), fl = d.createElementNS(NS, "filters");
+  fc.setAttribute("colId", "4"); fl.setAttribute("blank", "1"); fc.append(fl); af.append(fc);
+  let pr = d.getElementsByTagName("sheetPr")[0];
+  if (!pr) { pr = d.createElementNS(NS, "sheetPr"); ws.insertBefore(pr, ws.firstElementChild); }
+  pr.setAttribute("filterMode", "1");
+  setFilterName(B, sheet, ref);
+  B.put(sheet.file, xmlText(d));
+}
+
+// 02新增统计: 8 rows per month (A/B x 单独/大群/小群 + 汇总), one column per day, sums as formulas
+function statValues() {
+  const out = {}, td = TD();
+  Object.entries(td.statsBase || {}).forEach(([k, days]) => { out[k] = { ...days }; });
+  const counted = {};
+  td.items.forEach(x => {
+    const s = source(x.code), d = codeDate(x); if (!s || !d) return;
+    const k = monthCode(d) + "|" + s.row; (counted[k] ||= {})[d.getDate()] = (counted[k][d.getDate()] || 0) + 1;
+  });
+  Object.entries(counted).forEach(([k, days]) => { out[k] ||= {}; Object.entries(days).forEach(([day, n]) => { out[k][day] = Math.max(out[k][day] || 0, n); }); });
+  return out;
+}
+function fillStats(B, sheet) {
+  const d = xml(B.text(sheet.file)), sd = d.getElementsByTagName("sheetData")[0];
+  const rows = [...sd.getElementsByTagName("row")];
+  const header = rows.find(r => r.getAttribute("r") === "1");
+  const tpl = k => rows.find(r => +r.getAttribute("r") === 2 + k) || rows.find(r => +r.getAttribute("r") === 2) || header;
+  const styles = STAT_ROWS.map((_, k) => ({ row: tpl(k), st: styleMap(tpl(k)) }));
+  rows.forEach(r => { if (r !== header) sd.removeChild(r); });
+  const vals = statValues();
+  // months: from the first one with data to this month
+  const months = Object.keys(vals).map(k => k.split("|")[0]).sort();
+  let m = months.length ? new Date(2000 + +months[0].slice(1, 3), +months[0].slice(3) - 1, 1) : new Date(DAY.getFullYear(), DAY.getMonth(), 1);
+  let r = 2;
+  while (m <= DAY) {
+    const mc = monthCode(m), days = new Date(m.getFullYear(), m.getMonth() + 1, 0).getDate();
+    STAT_ROWS.forEach(([key, label], k) => {
+      const { row: t, st } = styles[k], row = d.createElementNS(NS, "row"), sum = key.length === 1;
+      row.setAttribute("r", r);
+      ["s", "customFormat", "ht", "customHeight"].forEach(a => { if (t && t !== header && t.getAttribute(a)) row.setAttribute(a, t.getAttribute(a)); });
+      row.append(cell(d, "A" + r, st[1], "num", bizYear(m)), cell(d, "B" + r, st[2], "num", mc),
+        sum ? cell(d, "C" + r, st[3], "f", `SUM(C${r - 3}:C${r - 1})`) : cell(d, "C" + r, st[3], "num", 1),
+        cell(d, "D" + r, st[4], "str", label));
+      for (let day = 1; day <= 31; day++) {
+        const col = colName(4 + day), date = new Date(m.getFullYear(), m.getMonth(), day);
+        if (sum) { row.append(cell(d, col + r, st[4 + day], "f", `SUM(${col}${r - 3}:${col}${r - 1})`)); continue; }
+        const v = (vals[mc + "|" + key] || {})[day];
+        const fill = day <= days && date <= DAY && WORKDAYS.includes(date.getDay());
+        row.append(cell(d, col + r, st[4 + day], "num", v != null ? v : fill ? 0 : ""));
+      }
+      row.append(cell(d, "AJ" + r, st[36], "f", sum ? `SUM(AJ${r - 3}:AJ${r - 1})` : `SUM(E${r}:AI${r})`));
+      sd.append(row); r++;
+    });
+    m = new Date(m.getFullYear(), m.getMonth() + 1, 1);
+  }
+  const dim = d.getElementsByTagName("dimension")[0]; if (dim) dim.setAttribute("ref", "A1:BF" + (r - 1));
+  B.put(sheet.file, xmlText(d));
+}
+
+function b64(u8) { let s = ""; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode(...u8.subarray(i, i + 0x8000)); return btoa(s); }
+function unb64(s) { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }
+function templateBytes() { try { const t = localStorage.getItem(TEMPLATE_KEY); if (t) return unb64(t); } catch (e) {} return unb64(DEFAULT_XLSX); }
+
+async function buildXlsx() {
+  const td = TD();
+  // 须知 6: an item that was OK and already sent once gets 先前已传 = 1
+  td.items.forEach(x => { if (status(x) === "OK" && x.okSent) x.sent = 1; });
+  const B = book(await unzip(templateBytes().buffer));
+  const byCode = (a, b) => (codeDate(a) || 0) - (codeDate(b) || 0) || a.code.localeCompare(b.code);
+  const direct = td.items.filter(x => sheetOf(x) === "direct").sort(byCode);
+  const indirect = td.items.filter(x => sheetOf(x) === "indirect").sort(byCode);
+  if (B.direct) fillList(B, B.direct, direct, B.text(B.direct.file));
+  if (B.indirect && indirect.length) {
+    // the 间接上级 sheet may be empty in the file: then it gets the 直接上级 sheet's columns and header
+    const own = B.text(B.indirect.file);
+    const base = /<row /.test(own) ? own : B.text(B.direct.file)
+      .replace(/ xr:uid="\{[^}]*\}"/g, "").replace(/<pageSetup([^>]*?) r:id="[^"]*"/, "<pageSetup$1").replace(/<(legacyDrawing|drawing)[^>]*\/>/g, "")
+      .replace(/<tabColor[^>]*\/>/, "");
+    fillList(B, B.indirect, indirect, base);
+  }
+  if (B.stats) fillStats(B, B.stats);
+  // formulas changed: Excel recalculates on opening; the old calculation chain is dropped
+  const calc = B.wb.getElementsByTagName("calcPr")[0]; if (calc) calc.setAttribute("fullCalcOnLoad", "1");
+  B.put("xl/workbook.xml", xmlText(B.wb));
+  B.files = B.files.filter(f => f.name !== "xl/calcChain.xml");
+  B.put("xl/_rels/workbook.xml.rels", B.text("xl/_rels/workbook.xml.rels").replace(/<Relationship [^>]*calcChain[^>]*\/>/, ""));
+  B.put("[Content_Types].xml", B.text("[Content_Types].xml").replace(/<Override [^>]*calcChain[^>]*\/>/, ""));
+  return zip(B.files);
+}
+
+async function downloadXlsx() {
+  const td = TD();
+  if (!td.fileBase.trim()) { toast("先在上面填写文件名"); return; }
+  const blob = await buildXlsx();
+  const now = new Date(), name = fileName();
+  const a = el("a"); a.href = URL.createObjectURL(blob); a.download = name; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  td.sends.push({ day: today(), time: String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0") });
+  td.sends = td.sends.slice(-200);
+  td.items.forEach(x => { if (status(x) === "OK") x.okSent = true; });
+  save(); renderTodo(); refresh();
+  toast("已下载 " + name);
+}
+
+// reading the current Excel once: items from both 01 sheets, 02 numbers kept, the file becomes the template
+async function importXlsx(file) {
+  const buf = await file.arrayBuffer(), B = book(await unzip(buf.slice(0)));
+  if (!B.direct) throw new Error("找不到“01日常清单-直接上级”子表");
+  const items = [];
+  [B.direct, B.indirect].forEach(sh => {
+    if (!sh) return;
+    const sheet = sh === B.direct ? "direct" : "indirect";
+    readRows(B, sh).filter(r => r.r > 1).forEach(({ cells: c }) => {
+      const code = String(c[1] || "").trim().toUpperCase(); if (!code && !c[2]) return;
+      const x = { code, desc: String(c[2] || ""), notes: String(c[6] || "").replace(/\r/g, ""), xDate: serialToIso(c[4]),
+        sent: String(c[5] || "").trim() === "1" ? 1 : 0, okSent: false, got: "", sheet };
+      const d = pastDate(code.slice(0, 4), x.xDate ? fromIso(x.xDate) : DAY);
+      x.got = d ? iso(d) : today();
+      if (status(x) === "OK" && !x.xDate) x.xDate = x.got;
+      items.push(x);
+    });
+  });
+  const base = {};
+  if (B.stats) readRows(B, B.stats).filter(r => r.r > 1).forEach(({ cells: c }) => {
+    const month = String(c[2] || ""), key = (STAT_ROWS.find(s => s[1] === String(c[4] || "").trim()) || [])[0];
+    if (!/^\d{5}$/.test(month) || !key || key.length < 2) return;
+    for (let day = 1; day <= 31; day++) { const v = c[4 + day]; if (v !== undefined && v !== "" && !isNaN(+v)) (base[month + "|" + key] ||= {})[day] = +v; }
+  });
+  return { items, base, bytes: new Uint8Array(buf) };
+}
+
+// ---------- tabs and buttons ----------
+function tab(name) {
+  document.body.dataset.tab = name;
+  try { localStorage.setItem("journal-tab", name); } catch (e) {}
+  if (name === "todo") renderTodo();
+}
+document.getElementById("tabJournal").addEventListener("click", () => { tab("journal"); render(); });
+document.getElementById("tabTodo").addEventListener("click", () => tab("todo"));
+document.getElementById("xlsxOut").addEventListener("click", () => downloadXlsx().catch(e => toast("下载失败：" + e.message)));
+document.getElementById("xlsxIn").addEventListener("change", async e => {
+  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+  try {
+    const r = await importXlsx(f), td = TD();
+    if (!confirm(`读到 ${r.items.length} 条记录。用这个文件替换现在的日常清单？（这个文件也会成为以后下载的样子）`)) return;
+    td.items = r.items; td.statsBase = r.base;
+    // the imported file's name without its date part becomes the file name
+    const m = f.name.replace(/\.xlsx$/i, "").match(/^(.*?)-\d{6,8}(-\d+)?$/); if (m) td.fileBase = m[1];
+    try { localStorage.setItem(TEMPLATE_KEY, b64(r.bytes)); } catch (err) { toast("文件太大，没有存成样板；下载会用默认样子"); }
+    save(); renderTodo(); refresh(); toast("已导入 " + r.items.length + " 条");
+  } catch (err) { toast("读不了这个文件：" + err.message); }
+});
+
+let startTab = "journal"; try { startTab = localStorage.getItem("journal-tab") || "journal"; } catch (e) {}
+render();
+tab(startTab);
+</script>
+</body>
+</html>
