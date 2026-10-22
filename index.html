@@ -71,6 +71,7 @@
   body[data-tab="journal"] #tabJournal, body[data-tab="todo"] #tabTodo { background: var(--ink); color: var(--paper); border-color: var(--ink); }
   body[data-tab="journal"] .tonly, body[data-tab="todo"] .jonly { display: none !important; }
   .todohead { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 12px; }
+  .fname { font-weight: bold; }
   .todohead input { font: inherit; padding: 2px 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--edit); color: var(--ink); }
   .addbox { display: flex; gap: 8px; margin-bottom: 16px; align-items: flex-start; }
   .addbox textarea { flex: 1; min-height: 64px; font: inherit; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--paper); color: var(--ink); }
@@ -679,7 +680,14 @@ const TEMPLATE_KEY = "journal-xlsx-template";
 
 // which 01 sheet an item goes on: the sheet it was imported from, else by its letter
 function sheetOf(x) { return x.sheet || (source(x.code) || {}).sheet || "direct"; }
-function TD() { if (!S.todo) S.todo = { items: [], team: "", name: "", sends: [], statsBase: {} }; return S.todo; }
+function TD() {
+  if (!S.todo) S.todo = { items: [], sends: [], statsBase: {} };
+  // file name = your own part (editable) + "-" + today's date, e.g. 日常清单-B01组-15.Arthur-20261019.xlsx
+  if (S.todo.fileBase == null) S.todo.fileBase = S.todo.team && S.todo.name ? `日常清单-${S.todo.team}-${S.todo.name}` : "日常清单-B01组-姓名";
+  return S.todo;
+}
+const fileDate = () => DAY.getFullYear() + T();
+const fileName = () => TD().fileBase.trim() + "-" + fileDate() + ".xlsx";
 function source(code) { const m = (code || "").match(CODE_RE); return m ? SOURCES[m[2]] : null; }
 function noteLines(x) { return x.notes.split("\n").map(l => l.trim()).filter(Boolean); }
 // 须知 5: OK = last note line ends with X; G = a note line starts with today's date; otherwise empty
@@ -741,8 +749,11 @@ let showSent = false;
 function renderTodo() {
   const td = TD(); todoEl.innerHTML = "";
   const head = el("div", "todohead");
-  const inp = (label, key, w) => { const i = el("input"); i.value = td[key]; i.style.width = w; i.addEventListener("input", () => { td[key] = i.value.trim(); save(); }); head.append(label, i); };
-  inp("组 ", "team", "5em"); inp(" 姓名 ", "name", "6em");
+  const fn = el("span", "fname"); fn.contentEditable = "plaintext-only"; fn.textContent = td.fileBase; fn.dataset.ph = "日常清单-组-姓名";
+  fn.title = "文件名（可以改）；后面的日期每天自动更新";
+  fn.addEventListener("input", () => { td.fileBase = fn.textContent.replace(/[\\/:*?"<>|\n]/g, ""); clearTimeout(saveTimer); saveTimer = setTimeout(save, 300); });
+  fn.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); fn.blur(); } });
+  head.append("文件名 ", fn, el("span", "calc", "-" + fileDate() + ".xlsx"));
   const counts = el("span", "legend"); counts.id = "todoCounts"; head.append(counts); showCounts();
   const cb = el("label", "legend"); const c = el("input"); c.type = "checkbox"; c.checked = showSent;
   c.addEventListener("change", () => { showSent = c.checked; renderTodo(); }); cb.append(c, " 显示已传的已收官记录"); head.append(cb);
@@ -1043,10 +1054,9 @@ async function buildXlsx() {
 
 async function downloadXlsx() {
   const td = TD();
-  if (!td.team || !td.name) { toast("先在上面填写 组 和 姓名"); return; }
+  if (!td.fileBase.trim()) { toast("先在上面填写文件名"); return; }
   const blob = await buildXlsx();
-  const now = new Date(), n = td.sends.filter(s => s.day === today()).length + 1;
-  const name = `日常清单-${td.team}-${td.name}-${y2(DAY.getFullYear())}${T()}-${n}.xlsx`;
+  const now = new Date(), name = fileName();
   const a = el("a"); a.href = URL.createObjectURL(blob); a.download = name; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
   td.sends.push({ day: today(), time: String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0") });
   td.sends = td.sends.slice(-200);
@@ -1097,7 +1107,8 @@ document.getElementById("xlsxIn").addEventListener("change", async e => {
     const r = await importXlsx(f), td = TD();
     if (!confirm(`读到 ${r.items.length} 条记录。用这个文件替换现在的日常清单？（这个文件也会成为以后下载的样子）`)) return;
     td.items = r.items; td.statsBase = r.base;
-    const m = f.name.match(/^日常清单-([^-]+)-([^-]+)-/); if (m) { td.team ||= m[1]; td.name ||= m[2]; }
+    // the imported file's name without its date part becomes the file name
+    const m = f.name.replace(/\.xlsx$/i, "").match(/^(.*?)-\d{6,8}(-\d+)?$/); if (m) td.fileBase = m[1];
     try { localStorage.setItem(TEMPLATE_KEY, b64(r.bytes)); } catch (err) { toast("文件太大，没有存成样板；下载会用默认样子"); }
     save(); renderTodo(); refresh(); toast("已导入 " + r.items.length + " 条");
   } catch (err) { toast("读不了这个文件：" + err.message); }

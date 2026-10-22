@@ -35,7 +35,9 @@ worked out, red means "check this". 「复制日志」 copies the text exactly a
   ends in X (打X登记日期 = that day), `G` when a note line starts with today's
   date. 先前已传 = 1 once an OK item has been sent before (须知 6). The journal's
   `*组内日常清单表` line is filled from this list.
-- 「下载Excel」 writes `日常清单-组-姓名-2YYMMDD-n.xlsx` (n = sends today) from a
+- 「下载Excel」 saves as `<file name>-YYYYMMDD.xlsx`, e.g.
+  `日常清单-B01组-15.Arthur-20261019.xlsx`: the name is editable on the tab
+  (taken from the imported file), the date is always today. Built from a
   template file: only the two 01 sheets and 02新增统计 are rewritten (02: 8 rows
   per month, days Mon-Sat filled, sums as formulas); every other sheet stays as
   it is in the template. 「导入Excel」 reads your current file once and makes it
