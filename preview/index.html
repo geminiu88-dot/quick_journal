@@ -119,9 +119,12 @@
   .hrow.bad { background: var(--bad); }
   #hours button { cursor: pointer; }
   .todohead input { font: inherit; padding: 2px 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--edit); color: var(--ink); }
-  .addbox { display: flex; gap: 8px; margin-bottom: 16px; align-items: flex-start; }
-  .addbox textarea { flex: 1; min-height: 64px; font: inherit; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--paper); color: var(--ink); }
-  .addbox button { font: inherit; padding: 6px 16px; border-radius: 6px; border: 1px solid var(--ui); background: var(--ui); color: #fff; cursor: pointer; }
+  .addbox { display: flex; gap: 6px; align-items: flex-start; flex: 1; min-width: 320px; }
+  .addbox textarea { flex: 1; resize: none; font: inherit; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--paper); color: var(--ink); }
+  .addbox button { font: inherit; padding: 3px 12px; border-radius: 6px; border: 1px solid var(--ui); background: var(--ui); color: #fff; cursor: pointer; }
+  .todocols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+  .todocol h3 { margin: 0 0 8px; font-size: 15px; }
+  .todocol:first-child h3 { color: var(--bad-line); }
   .card { background: var(--paper); border: 1px solid var(--border); border-left: 4px solid var(--edit-line); border-radius: 4px; padding: 8px 12px; margin-bottom: 8px; }
   .card.bad { background: var(--paper) !important; border-left-color: var(--bad-line) !important; }
   .card.ok { border-left-color: #3f9b5a; opacity: .75; }
@@ -948,6 +951,16 @@ function status(x) {
   return ls.some(l => l.startsWith(T())) ? "G" : "";
 }
 function planOf(x) { const ls = noteLines(x); const m = ls.length && ls[ls.length - 1].match(/(\d{4})$/); return m ? m[1] : ""; }
+// the plan date is the first such date on or after the day of the line it ends
+function planDate(x) {
+  const ls = noteLines(x), last = ls[ls.length - 1] || "", md = planOf(x);
+  if (!md || last.length <= 4) return null;
+  const from = pastDate(last.slice(0, 4), DAY) || DAY;
+  let d = new Date(from.getFullYear(), +md.slice(0, 2) - 1, +md.slice(2));
+  if (d.getMonth() !== +md.slice(0, 2) - 1) return null;
+  if (d < from) d = new Date(from.getFullYear() + 1, +md.slice(0, 2) - 1, +md.slice(2));
+  return d;
+}
 function syncOk(x) { const ok = status(x) === "OK"; if (ok && !x.xDate) x.xDate = today(); if (!ok) x.xDate = ""; }
 // MMDD -> the latest such date on or before ref (a code is never from the future)
 function pastDate(md, ref) {
@@ -963,7 +976,13 @@ function problems(x) {
   if (!source(x.code)) p.push("编码格式不对（如 1019G-02）");
   if (!x.desc.trim()) p.push("没有描述");
   if (noteLines(x).some(l => !/^\d{4}/.test(l))) p.push("备注每行要以日期开头");
-  if (status(x) !== "OK") { const d = mmddToDate(planOf(x), DAY); if (!d || d <= DAY) p.push("最后一行末尾要写计划日期（晚于今天）"); }
+  if (status(x) !== "OK") {
+    const d = planDate(x);
+    if (!d) p.push("最后一行末尾要写计划日期");
+    else if (d <= DAY) p.push(d < DAY ? "计划日期 " + planOf(x) + " 已过" : "计划今天到期");
+    if (noteLines(x).length && /^\d{4}$/.test(noteLines(x).slice(-1)[0])) p.push("今天还没写做了什么");
+    else if (!noteLines(x).length) p.push("还没有记录");
+  }
   return p;
 }
 // numbers for the journal's 组内日常清单表 line
@@ -986,7 +1005,7 @@ function parseMessages(text) {
     if (codes.length) {
       const m = codes[0];
       cur = { code: m[1] + m[2].toUpperCase() + "-" + m[3].padStart(2, "0"),
-        desc: s.replace(m[0], "").replace(/^[\s:：,，、.。]+|[\s:：,，、]+$/g, "").replace(/[（(]\s*[）)]/g, "").replace(/\s{2,}/g, " ") };
+        desc: s.replace(m[0], "").replace(/^[\s:：,，、.。]+|[\s:：,，、]+$/g, "").replace(/[（(]\s*[）)]/g, "").replace(/\s{2,}/g, " ").replace(/([，,、；;])(\s*[，,、；;])+/g, "$1") };
       out.push(cur);
     } else if (cur) cur.desc += (cur.desc ? " " : "") + s;
     else out.push(cur = { code: "", desc: s });
@@ -1005,13 +1024,12 @@ function renderTodo() {
   fn.addEventListener("input", () => { td.fileBase = fn.textContent.replace(/[\\/:*?"<>|\n]/g, ""); clearTimeout(saveTimer); saveTimer = setTimeout(save, 300); });
   fn.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); fn.blur(); } });
   head.append("文件名 ", fn, el("span", "calc", "-" + fileDate() + ".xlsx"));
-  const counts = el("span", "legend"); counts.id = "todoCounts"; head.append(counts); showCounts();
-  const cb = el("label", "legend"); const c = el("input"); c.type = "checkbox"; c.checked = showSent;
-  c.addEventListener("change", () => { showSent = c.checked; renderTodo(); }); cb.append(c, " 显示已传的已收官记录"); head.append(cb);
-  todoEl.append(head);
 
+  // paste box: one line until you click into it
   const add = el("div", "addbox");
-  const ta = el("textarea"); ta.placeholder = "把上级带编码的消息粘贴到这里（可以一次贴几条），编码在哪个位置都可以，如 1019G-02";
+  const ta = el("textarea"); ta.rows = 1; ta.placeholder = "粘贴上级带编码的消息（可以几条），如 1019G-02 …";
+  ta.addEventListener("focus", () => { ta.rows = 5; });
+  ta.addEventListener("blur", () => { if (!ta.value.trim()) ta.rows = 1; });
   const b = el("button", "main", "加入清单");
   b.addEventListener("click", () => {
     const msgs = parseMessages(ta.value); let added = 0, dup = [];
@@ -1022,12 +1040,26 @@ function renderTodo() {
     ta.value = ""; save(); renderTodo(); refresh();
     toast("加入 " + added + " 条" + (dup.length ? "；已在清单里：" + dup.join("，") : ""));
   });
-  add.append(ta, b); todoEl.append(add);
+  add.append(ta, b); head.append(add);
+  const counts = el("span", "legend"); counts.id = "todoCounts"; head.append(counts); showCounts();
+  const cb = el("label", "legend"); const c = el("input"); c.type = "checkbox"; c.checked = showSent;
+  c.addEventListener("change", () => { showSent = c.checked; renderTodo(); }); cb.append(c, " 显示已传的已收官记录"); head.append(cb);
+  todoEl.append(head);
 
+  // two columns: needs you now (plan date passed or missing, no note yet) | everything else
   const list = td.items.filter(x => showSent || !x.sent)
     .sort((a, b) => (codeDate(a) || 0) - (codeDate(b) || 0) || a.code.localeCompare(b.code));
-  list.forEach(x => todoEl.append(card(x)));
-  if (!list.length) todoEl.append(el("p", "legend", "清单是空的。"));
+  const urgent = list.filter(x => status(x) !== "OK" && problems(x).length);
+  const rest = list.filter(x => !urgent.includes(x)).sort((a, b) => (status(a) === "OK") - (status(b) === "OK"));
+  const cols = el("div", "todocols");
+  [["要处理：逾期 / 没记录", urgent, "都处理好了。"], ["进行中 / 已收官", rest, "没有。"]].forEach(([title, items, empty]) => {
+    const col = el("div", "todocol");
+    col.append(el("h3", "", title + "（" + items.length + "）"));
+    items.forEach(x => col.append(card(x)));
+    if (!items.length) col.append(el("p", "legend", empty));
+    cols.append(col);
+  });
+  todoEl.append(cols);
 }
 function showCounts() {
   const c = document.getElementById("todoCounts");
