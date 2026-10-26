@@ -37,13 +37,29 @@ worked out, red means "check this". 「复制日志」 copies the text exactly a
   ends in X (打X登记日期 = that day), `G` when a note line starts with today's
   date. 先前已传 = 1 once an OK item has been sent before (须知 6). The journal's
   `*组内日常清单表` line is filled from this list.
+  The big boss is everyone's direct boss too: `G` (to the whole group) goes on
+  01直接上级, no letter (to one person) on his own sheet, 01间接上级.
+- **Kanban (preview):** one column per list side by side: 直接上级, 间接上级 ·
+  大老板, and each F tracking sheet in use. In each column: 要处理 (overdue, no
+  plan date, no record; for an F sheet: not updated on its review day, read
+  from its name, e.g. `周1周4`) on top, then 进行中, then closed but not sent;
+  closed and sent items fold away at the bottom (30 at a time). The search box
+  also searches the folded history.
 - 「下载Excel」 saves as `<file name>-YYYYMMDD.xlsx`, e.g.
   `日常清单-B01组-15.Arthur-20261019.xlsx`: the name is editable on the tab
   (taken from the imported file), the date is always today. Built from a
-  template file: only the two 01 sheets and 02新增统计 are rewritten (02: 8 rows
-  per month, days Mon-Sat filled, sums as formulas); every other sheet stays as
-  it is in the template. 「导入Excel」 reads your current file once and makes it
-  the template (kept in this browser only). The built-in template
+  template file. **An imported file is changed in place:** its rows never move
+  (so Excel comments, pictures and hidden rows stay right), only rows edited
+  here are rewritten, new items go at the bottom, and items that came from the
+  file can't be deleted. 状态 OK in the file counts as closed even without the X
+  (older items). 02新增统计 keeps each person's own rows (deleted rows stay
+  deleted); only counts of items added here are written, `未完成` rows are
+  filled from the open items of each day the page was opened, and a new month
+  copies the rows of the month before. Untouched sheets go out byte for byte.
+  「导入Excel」 reads your current file once and makes it the template, kept in
+  this browser's IndexedDB (room for big files; localStorage holds ~5 MB). A
+  list never imported uses the built-in file the old way (rows rebuilt, 02: 8
+  rows per month). The built-in template
   (`DEFAULT_XLSX`) is the group's file with the example rows, the 须知 pictures
   and author names removed. No library: the browser unzips/zips the file.
 - Not done yet: business-year rollover on 31 Oct (rule 10), other teams' formats.
