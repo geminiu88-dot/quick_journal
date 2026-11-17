@@ -152,6 +152,20 @@
   .cardbtns { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
   .cardbtns button { font: inherit; font-size: 13px; padding: 1px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--paper); color: var(--ink); cursor: pointer; }
   .prob { color: var(--bad-line); font-size: 13px; }
+  /* removing something = a small cross in its top right corner */
+  button.x, .fsec button.x { position: absolute; top: 3px; right: 3px; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 4px;
+    background: none; color: var(--muted); font: inherit; font-size: 17px; line-height: 20px; text-align: center; cursor: pointer; appearance: none; -webkit-appearance: none; }
+  button.x:hover, .fsec button.x:hover { background: var(--bad-line); color: #fff; }
+  .hrow button.x { position: static; flex: none; }
+  .icard, .ccard, .card { position: relative; }
+  .icard > .irow:first-child, .ccard > .irow:first-child, .cardtop { padding-right: 24px; }
+  .pline { position: relative; } .pline > .irow:first-child { padding-right: 24px; }
+  .sign { flex: none; width: 1.5em; text-align: center; font-weight: bold; border-radius: 4px; background: var(--calc); cursor: help; }
+  .sign[data-s="+"] { background: #3f9b5a; color: #fff; }
+  .arrow { color: var(--muted); }
+  .hrow .hc { width: 7.5em; flex: none; } .hrow .hn { width: 4.2em; flex: none; } .hrow .hs { width: 7em; flex: none; }
+  .hrow.hcap { font-size: 12px; color: var(--muted); margin-bottom: 0; } .hrow.hcap span { padding-left: 2px; } .hrow.hcap .grow { flex: 1; } .hrow.hcap .hx { width: 22px; flex: none; }
+  .qlabel { font-size: 13px; font-weight: bold; }
   @media print { .bar, .ui, .add, details { display: none !important; } [contenteditable], .calc, select { background: none; border: 0; } }
 </style>
 </head>
@@ -386,6 +400,7 @@ const form = document.getElementById("form");
 
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 function calc(fn) { const s = el("span", "calc"); const r = () => { s.textContent = fn(); }; r(); refreshers.push(r); return s; }
+function xBtn(title, fn) { const b = el("button", "x", "×"); b.type = "button"; b.title = title; b.setAttribute("aria-label", title); b.addEventListener("click", fn); return b; }
 function ui(text, fn, title) { const s = el("span", "ui", text); if (title) s.title = title; s.addEventListener("click", fn); return s; }
 
 function planOk(x) {
@@ -545,6 +560,11 @@ const opt = (sel, v, t) => { const o = el("option", "", t); o.value = v; sel.app
 function hoursSection() {
   const sec = section("今日工时", "每做一件事加一条：选类别，写做了什么，选时间。日志里的 @ 行和总计自动算。");
   sec.querySelector("h3").append("　", calc(hoursTotal));
+  if (S.entries.length) {   // the column names once, not in every row
+    const cap = el("div", "hrow hcap");
+    cap.append(el("span", "hc", "类别"), el("span", "grow", "做了什么"), el("span", "hn", "小时"), el("span", "hn", "分钟"), el("span", "hs", "多/少一点"), el("span", "hx"));
+    sec.append(cap);
+  }
   S.entries.forEach(e => {
     const row = el("div", "hrow");
     const cat = el("select"); HOUR_LABELS.forEach((l, i) => opt(cat, i, l)); cat.value = e.cat;
@@ -554,12 +574,12 @@ function hoursSection() {
     if (e.min % 5) opt(m, e.min % 60, String(e.min % 60).padStart(2, "0"));
     h.value = Math.floor(e.min / 60); m.value = e.min % 60;
     const sg = el("select"); opt(sg, "", "　"); opt(sg, "+", "+ 多一点"); opt(sg, "-", "- 少一点"); sg.value = e.sign;
-    const del = el("button", "", "删除");
+    const del = xBtn("删除这一条", () => { S.entries.splice(S.entries.indexOf(e), 1); renderForm(); changed(); });
+    cat.className = "hc"; h.className = m.className = "hn"; sg.className = "hs";
     const check = () => row.classList.toggle("bad", !(e.min > 0) || !e.text.trim());
     const upd = () => { e.cat = +cat.value; e.text = text.value; e.min = +h.value * 60 + +m.value; e.sign = sg.value; check(); changed(); };
     [cat, h, m, sg].forEach(x => x.addEventListener("change", upd)); text.addEventListener("input", upd);
-    del.addEventListener("click", () => { S.entries.splice(S.entries.indexOf(e), 1); renderForm(); changed(); });
-    row.append(cat, text, h, "小时", m, "分", sg, del); check();
+    row.append(cat, text, h, m, sg, del); check();
     sec.append(row);
   });
   sec.append(addButton("加一条", () => {
@@ -616,12 +636,19 @@ function itemCard(list, x, withCat) {
     top.append(sel);
   }
   const text = textBox(() => x.text, v => { x.text = v; touch(); }, "发生了什么、做了什么、打算怎么办", true);
-  top.append(text);
+  // the sign this item gets in the journal: + changed today, - not, X finished
+  const sign = el("span", "sign");
+  refreshers.push(() => {
+    const s = x.plan === "X" ? "X" : x.edited === today() ? "+" : "-";
+    sign.textContent = s; sign.dataset.s = s;
+    sign.title = s === "X" ? "已结束，明天从日志删除" : s === "+" ? "今天改过，日志里是 +" : "今天没改，日志里是 -";
+  });
+  top.prepend(sign); top.append(text);
   const bottom = el("div", "irow small");
-  const start = el("input", "short"); start.value = x.start; start.title = "入日志的日期（MMDD），或 W43 这样的周数";
+  const start = el("input", "short"); start.value = x.start; start.placeholder = "入日志"; start.title = "入日志的日期（MMDD），或 W43 这样的周数";
   start.addEventListener("input", () => { x.start = start.value.trim(); touch(); changed(); });
   const plan = el("input"); plan.type = "date";
-  const tomorrow = new Date(DAY); tomorrow.setDate(tomorrow.getDate() + 1); plan.min = iso(tomorrow);
+  const tomorrow = new Date(DAY); tomorrow.setDate(tomorrow.getDate() + 1); plan.min = iso(tomorrow); plan.title = "计划日期（要晚于今天）";
   const pd = mmddToDate(x.plan, DAY); if (pd) plan.value = iso(pd);
   plan.addEventListener("change", () => { if (plan.value) { x.plan = mmdd(fromIso(plan.value)); x.closed = ""; touch(); changed(); } });
   const upd = el("button", "", "今日更新");
@@ -636,11 +663,9 @@ function itemCard(list, x, withCat) {
     if (x.plan === "X") { x.plan = ""; x.closed = ""; } else { x.plan = "X"; x.closed = today(); }
     touch(); renderForm(); changed();
   });
-  const del = el("button", "", "删除");
-  del.addEventListener("click", () => { if (confirm("删除这一条？")) { list.splice(list.indexOf(x), 1); renderForm(); changed(); } });
-  const state = calc(() => x.plan === "X" ? "已结束（明天从日志删除）" : x.edited === today() ? "今天改过 → +" : "今天没改 → -");
-  bottom.append("入日志 ", start, "　计划 ", x.plan === "X" ? el("b", "", "X") : plan, " ", upd, end, del, "　", state);
-  card.append(top, bottom);
+  const del = xBtn("删除这一条", () => { if (confirm("删除这一条？")) { list.splice(list.indexOf(x), 1); renderForm(); changed(); } });
+  bottom.append(start, el("span", "arrow", "→"), x.plan === "X" ? el("b", "", "X") : plan, upd, end);
+  card.append(top, bottom, del);
   refreshers.push(() => { card.classList.toggle("bad", !!itemBad(x)); card.classList.toggle("closed", x.plan === "X"); });
   return card;
 }
@@ -671,17 +696,17 @@ function clientsSection() {
     name.addEventListener("input", () => { c.name = name.value.trim(); changed(); });
     const role = el("select"); [["前", "前道"], ["前后", "前后道"], ["后", "后道"]].forEach(([v, t]) => opt(role, v, t)); role.value = c.role;
     role.addEventListener("change", () => { c.role = role.value; renderForm(); changed(); });
-    const delC = el("button", "", "删除客户");
-    delC.addEventListener("click", () => { if (confirm("删除客户 " + c.name + "？")) { S.clients.splice(S.clients.indexOf(c), 1); renderForm(); changed(); } });
-    head.append(el("b", "", "客户 "), name, role, delC);
-    card.append(head);
+    const delC = xBtn("删除客户", () => { if (confirm("删除客户 " + c.name + "？")) { S.clients.splice(S.clients.indexOf(c), 1); renderForm(); changed(); } });
+    name.title = "客户简称（4位）"; role.title = "前道 / 前后道 / 后道";
+    head.append(name, role);
+    card.append(head, delC);
     c.lines.forEach((l, i) => {
       const pl = el("div", "pline");
       const r1 = el("div", "irow");
       const prod = el("input", "prod"); prod.value = l.product; prod.placeholder = "产品线（如 鞋1）";
       prod.addEventListener("input", () => { l.product = prod.value.trim(); changed(); });
-      r1.append(el("span", "flabel", "产品线 "), prod);
-      if (c.lines.length > 1) { const d = el("button", "", "删除产品线"); d.addEventListener("click", () => { if (confirm("删除这条产品线？")) { c.lines.splice(i, 1); renderForm(); changed(); } }); r1.append(d); }
+      r1.append(prod);
+      if (c.lines.length > 1) { const d = xBtn("删除产品线", () => { if (confirm("删除这条产品线？")) { c.lines.splice(i, 1); renderForm(); changed(); } }); pl.append(d); }
       pl.append(r1);
       // pairs: number boxes, which ones depends on 前/后
       const y = curYear(), r2 = el("div", "irow qty");
@@ -690,12 +715,13 @@ function clientsSection() {
         if (tip) w.title = tip;
         b.addEventListener("input", () => { set(b.value.replace(/[^\d]/g, "")); changed(); });
         refreshers.push(() => b.classList.toggle("bad", b.dataset.req === "1" && (get() ?? "") === ""));
-        w.append(label, b, "双"); r2.append(w); return b;
+        w.append(label, b); r2.append(w); return b;
       };
+      r2.append(el("span", "qlabel", c.role === "后" ? "双数" : "下单双数"));
       if (c.role !== "后") {
-        num(`${y - 1}年度下单`, () => l.orders[y - 1], v => { l.orders[y - 1] = v; }, "上个业务年度下单的双数");
-        num(`${y}年度下单`, () => l.orders[y], v => { l.orders[y] = v; }, "这个业务年度（11月-10月）到现在下单的双数");
-        num(`${y + 1}年度下单`, () => l.orders[y + 1], v => { l.orders[y + 1] = v; }, "下个业务年度已经下的单，没有就空着");
+        num(`${y - 1}年度`, () => l.orders[y - 1], v => { l.orders[y - 1] = v; }, "上个业务年度下单的双数");
+        num(`${y}年度`, () => l.orders[y], v => { l.orders[y] = v; }, "这个业务年度（11月-10月）到现在下单的双数");
+        num(`${y + 1}年度`, () => l.orders[y + 1], v => { l.orders[y + 1] = v; }, "下个业务年度已经下的单，没有就空着");
       }
       if (c.role !== "前") num("未出", () => l.unshipped, v => { l.unshipped = v; }, "这个业务年度已下单、还没出货的双数").dataset.req = "1";
       if (c.role !== "后") num("估", () => l.est, v => { l.est = v; }, "这个业务年度估计还会再下单的双数").dataset.req = "1";
@@ -720,7 +746,7 @@ function renderForm() {
   const auto = el("div", "fout"); auto.append("组内日常清单表（从日常清单自动来）→ ", calc(() => specText(DAILY[0]).t)); daily.append(auto);
   DAILY.slice(1).forEach(sp => specFields(daily, sp));
 
-  itemList(section("持续关注", "客诉、欠包装、测试未过、进度核对、船期预警、品质、会议等要跟踪的事。每条都要有计划日期（晚于今天）；今天改过的自动变 +。"), S.focus, true);
+  itemList(section("持续关注", "客诉、欠包装、测试未过、进度核对、船期预警、品质、会议等要跟踪的事。每条都要有计划日期（晚于今天）；今天改过的自动变 +。每条下面：入日志日期 → 计划日期。"), S.focus, true);
   clientsSection();
   itemList(section("C1无单老客 / C1新客", "以前下过单但近两年没单的客人，或新客。一旦下单，移到 C1有单老客。"), S.c1none, false);
   itemList(section("C2目标客"), S.c2, false);
@@ -1207,12 +1233,12 @@ function card(x) {
   const desc = el("div", "desc clamp"); desc.contentEditable = "plaintext-only"; desc.textContent = x.desc; desc.dataset.ph = "描述";
   const st = el("span", "chip st");
   // rows that came from the Excel stay (they are its history); only items added here can be deleted
-  const del = x.srcRow ? "" : ui("删除", () => { if (confirm("删除 " + x.code + "？")) { td.items.splice(td.items.indexOf(x), 1); save(); renderTodo(); refresh(); } });
+  const del = x.srcRow ? "" : xBtn("删除", () => { if (confirm("删除 " + x.code + "？")) { td.items.splice(td.items.indexOf(x), 1); save(); renderTodo(); refresh(); } });
   if (f) {
     (x.cats || []).filter(Boolean).forEach(c => top.append(el("span", "chip", c)));
     if (x.entered) top.append(el("span", "legend", mmdd(fromIso(x.entered)) + "入表"));
     top.append(st);
-  } else top.append(code, who, st, del);
+  } else { top.append(code, who, st); if (del) box.append(del); }
   // the description gets the card's full width, 3 lines until you click into it
   desc.addEventListener("focus", () => desc.classList.remove("clamp"));
   desc.addEventListener("blur", () => desc.classList.add("clamp"));
