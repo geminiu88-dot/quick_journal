@@ -38,7 +38,7 @@
   .bar .msg.bad { color: var(--bad-line); }
   .legend { font-size: 13px; color: var(--muted); }
   .legend span { padding: 0 6px; border-radius: 3px; }
-  main { max-width: 1100px; margin: 16px auto; padding: 0 16px; }
+  main { max-width: 1500px; margin: 16px auto; padding: 0 16px; }
   .doc { background: var(--paper); border: 1px solid var(--border); border-radius: 4px; padding: 24px 32px; }
   .line { min-height: 1.75em; white-space: pre-wrap; word-break: break-all; position: relative; }
   .line:hover > .ui { visibility: visible; }
@@ -72,6 +72,44 @@
   body[data-tab="journal"] .tonly, body[data-tab="todo"] .jonly { display: none !important; }
   .todohead { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 12px; }
   .fname { font-weight: bold; }
+  .jgrid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; align-items: start; }
+  .prevwrap { position: sticky; top: 64px; max-height: calc(100vh - 80px); display: flex; flex-direction: column; }
+  .prevhead { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  .prevhead #badCount.bad { color: var(--bad-line); }
+  .prevwrap .doc { overflow: auto; font-size: 13px; line-height: 1.6; padding: 12px 16px; }
+  .badline { background: var(--bad); }
+  .fsec { background: var(--paper); border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px; margin-bottom: 12px; }
+  .fsec h3 { margin: 0 0 2px; font-size: 16px; }
+  .fsec summary { cursor: pointer; }
+  .hint { color: var(--muted); font-size: 12px; margin: 0 0 8px; display: block; }
+  .field { display: block; margin: 6px 0; }
+  .flabel { display: block; font-size: 13px; font-weight: bold; }
+  .field textarea, .field input, .icard textarea, .irow input, .irow select, .fsec button {
+    font: inherit; font-size: 14px; padding: 3px 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--paper); color: var(--ink);
+    appearance: auto; -webkit-appearance: auto; }
+  .field textarea, .icard textarea { width: 100%; resize: none; overflow: hidden; background: var(--edit); line-height: 1.5; }
+  .fsec button { cursor: pointer; }
+  .fout { font-size: 12px; color: var(--muted); margin: 2px 0 8px; word-break: break-all; }
+  .fgroup { border-left: 3px solid var(--border); padding-left: 10px; margin-bottom: 10px; }
+  .wgroup { margin-top: 10px; } .wtitle { font-weight: bold; font-size: 14px; }
+  .icard { border: 1px solid var(--border); border-left: 4px solid var(--edit-line); border-radius: 4px; padding: 6px 8px; margin: 6px 0; }
+  .icard.bad { border-left-color: var(--bad-line); background: var(--paper) !important; }
+  .icard.closed { opacity: .6; }
+  .irow { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .irow textarea, .irow .grow { flex: 1; min-width: 200px; }
+  .irow.small { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .irow.small button, .irow.small input { font-size: 12px; padding: 1px 6px; }
+  input.short { width: 6em; }
+  input.prod { width: 16em; }
+  .irow.qty { gap: 4px 14px; margin: 4px 0; }
+  .num { font-size: 13px; white-space: nowrap; }
+  .num input { width: 7em; margin: 0 3px; }
+  body[data-prev="off"] .jgrid { grid-template-columns: minmax(0, 1fr); }
+  body[data-prev="off"] .prevwrap { display: none; }
+  .ccard { border: 1px solid var(--border); border-radius: 6px; padding: 8px; margin: 8px 0; }
+  .pline { margin: 6px 0 6px 12px; padding-left: 8px; border-left: 2px dotted var(--border); }
+  .addbtn { margin-top: 4px; }
+  .fsec button.same { font-size: 12px; padding: 0 8px; margin: 2px 0; }
   #hours { background: var(--paper); border: 1px solid var(--border); border-radius: 4px; padding: 10px 16px; margin-bottom: 12px; }
   .hhead { margin-bottom: 6px; }
   .hrow { display: flex; gap: 6px; align-items: center; margin-bottom: 4px; padding: 2px 4px; border-radius: 4px; }
@@ -81,9 +119,21 @@
   .hrow.bad { background: var(--bad); }
   #hours button { cursor: pointer; }
   .todohead input { font: inherit; padding: 2px 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--edit); color: var(--ink); }
-  .addbox { display: flex; gap: 8px; margin-bottom: 16px; align-items: flex-start; }
-  .addbox textarea { flex: 1; min-height: 64px; font: inherit; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--paper); color: var(--ink); }
-  .addbox button { font: inherit; padding: 6px 16px; border-radius: 6px; border: 1px solid var(--ui); background: var(--ui); color: #fff; cursor: pointer; }
+  .addbox { display: flex; gap: 6px; align-items: flex-start; flex: 1; min-width: 320px; }
+  .addbox textarea { flex: 1; resize: none; font: inherit; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--paper); color: var(--ink); }
+  .addbox button { font: inherit; padding: 3px 12px; border-radius: 6px; border: 1px solid var(--ui); background: var(--ui); color: #fff; cursor: pointer; }
+  .todocols { display: flex; gap: 16px; align-items: flex-start; overflow-x: auto; padding-bottom: 8px; }
+  .todocol { flex: 1 0 380px; min-width: 0; background: var(--bg); }
+  .todocol h3 { margin: 0 0 4px; font-size: 15px; }
+  .card details.cmt { font-size: 12px; color: var(--muted); border: 0; padding: 0; margin: 0; background: none; } .cmt summary { cursor: pointer; } .cmt pre { white-space: pre-wrap; margin: 2px 0 4px; font: inherit; }
+  .part { font-size: 13px; font-weight: bold; margin: 10px 0 4px; color: var(--muted); }
+  .part.hot { color: var(--bad-line); }
+  .todocol details.fold { background: none; border: 0; padding: 0; margin-top: 8px; }
+  .fold summary { cursor: pointer; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
+  .more { font: inherit; font-size: 13px; padding: 1px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--paper); color: var(--ink); cursor: pointer; }
+  .find { min-width: 260px; }
+  .pics { display: flex; gap: 6px; margin: 4px 0; flex-wrap: wrap; }
+  .pics img { height: 72px; max-width: 160px; object-fit: contain; border: 1px solid var(--border); border-radius: 4px; cursor: zoom-in; background: #fff; }
   .card { background: var(--paper); border: 1px solid var(--border); border-left: 4px solid var(--edit-line); border-radius: 4px; padding: 8px 12px; margin-bottom: 8px; }
   .card.bad { background: var(--paper) !important; border-left-color: var(--bad-line) !important; }
   .card.ok { border-left-color: #3f9b5a; opacity: .75; }
@@ -91,7 +141,10 @@
   .cardtop { display: flex; gap: 8px; align-items: baseline; }
   .cardtop [contenteditable] { background: none; border-bottom: 1px dashed var(--border); }
   .code { font-weight: bold; min-width: 6em; }
-  .desc { flex: 1; }
+  .desc { display: block; margin: 2px 0 4px; }
+  .desc.clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; cursor: text; }
+  .cardtop .st { margin-left: auto; }
+  .older { font-size: 12px; color: var(--ui); cursor: pointer; user-select: none; }
   .chip { font-size: 12px; padding: 0 8px; border-radius: 10px; background: var(--calc); white-space: nowrap; }
   .chip.st[data-s="OK"] { background: #3f9b5a; color: #fff; } .chip.st[data-s="G"] { background: var(--edit-line); color: #000; }
   .notes { width: 100%; margin-top: 6px; font: inherit; line-height: 1.6; padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px;
@@ -99,6 +152,23 @@
   .cardbtns { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
   .cardbtns button { font: inherit; font-size: 13px; padding: 1px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--paper); color: var(--ink); cursor: pointer; }
   .prob { color: var(--bad-line); font-size: 13px; }
+  /* removing something = a small cross in its top right corner */
+  button.x, .fsec button.x { position: absolute; top: 3px; right: 3px; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 4px;
+    background: none; color: var(--muted); font: inherit; font-size: 17px; line-height: 20px; text-align: center; cursor: pointer; appearance: none; -webkit-appearance: none; }
+  button.x:hover, .fsec button.x:hover { background: var(--bad-line); color: #fff; }
+  .hrow button.x { position: static; flex: none; }
+  .icard, .ccard, .card { position: relative; }
+  .icard > .irow:first-child, .ccard > .irow:first-child, .cardtop { padding-right: 24px; }
+  .pline { position: relative; } .pline > .irow:first-child { padding-right: 24px; }
+  .sign { flex: none; width: 1.5em; text-align: center; font-weight: bold; border-radius: 4px; background: var(--calc); cursor: help; }
+  .sign[data-s="+"] { background: #3f9b5a; color: #fff; }
+  .arrow { color: var(--muted); }
+  .hrow .hc { width: 7.5em; flex: none; } .hrow .hn { width: 4.2em; flex: none; } .hrow .hs { width: 7em; flex: none; }
+  .hrow.hcap { font-size: 12px; color: var(--muted); margin-bottom: 0; } .hrow.hcap span { padding-left: 2px; } .hrow.hcap .grow { flex: 1; } .hrow.hcap .hx { width: 22px; flex: none; }
+  .qlabel { font-size: 13px; font-weight: bold; }
+  .num input.chg { outline: 2px solid var(--ui); }
+  .sysrow { margin: 2px 0 8px; } .sysrow .hint { display: inline; margin: 0; }
+  a.bm { font-size: 13px; padding: 1px 10px; border: 1px dashed var(--ui); border-radius: 12px; color: var(--ui); text-decoration: none; cursor: grab; white-space: nowrap; }
   @media print { .bar, .ui, .add, details { display: none !important; } [contenteditable], .calc, select { background: none; border: 0; } }
 </style>
 </head>
@@ -110,17 +180,22 @@
   <button id="week" title="把每周回顾的日期和统计数字更新到今天">周五更新统计</button>
   <button id="hist">以前的日志</button>
   <button id="imp">导入现有日志</button>
-  <button id="sample">格式范本</button></span>
+  <button id="sample">格式范本</button>
+  <button id="prevToggle">隐藏日志文字</button></span>
   <span class="tonly"><button class="main" id="xlsxOut">下载Excel</button>
   <label class="btn">导入Excel<input type="file" id="xlsxIn" accept=".xlsx" hidden></label></span>
   <button id="export">备份到文件</button>
   <label class="btn">从备份恢复<input type="file" id="import" accept=".json" hidden></label>
   <span class="msg" id="msg"></span>
-  <span class="legend"><span style="background:var(--edit)">黄色 = 填写</span> <span style="background:var(--calc)">蓝色 = 自动</span> <span style="background:var(--bad)">红色 = 要检查</span></span>
 </div>
 <main>
-  <div class="jonly" id="hours"></div>
-  <div class="doc jonly" id="doc"></div>
+  <div class="jgrid jonly">
+    <div id="form"></div>
+    <div class="prevwrap">
+      <div class="prevhead"><b>日志文字</b>（自动生成，不用改；按「复制日志」）<span id="badCount"></span></div>
+      <div class="doc" id="doc"></div>
+    </div>
+  </div>
   <div id="todo" class="tonly"></div>
   <details class="jonly">
     <summary>日志规则（参考，不复制进日志）</summary>
@@ -319,72 +394,25 @@ function calcValue(k) {
   return (live ? counts() : S.weekSnap)[k];
 }
 
-// ---------- building the page ----------
+// ---------- the page: a plain form on the left, the journal text it makes on the right ----------
+// You only ever fill in the form. The journal text is generated from it, in the boss's exact format,
+// and is never edited by hand.
 let refreshers = [];
-const doc = document.getElementById("doc");
+const doc = document.getElementById("doc");      // the generated journal text (read-only)
+const form = document.getElementById("form");
 
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
-function line(...parts) { const d = el("div", "line"); parts.forEach(p => d.append(typeof p === "string" ? document.createTextNode(p) : p)); doc.append(d); return d; }
-
-// editable box: get/set read and write the stored value
-function ed(get, set, ph, opts = {}) {
-  const s = el("span", opts.wrap ? "wrap" : "");
-  s.contentEditable = "plaintext-only";
-  if (s.contentEditable !== "plaintext-only") s.contentEditable = "true";
-  s.textContent = get(); s.dataset.ph = ph ?? "…";
-  if (opts.empty) s.dataset.empty = opts.empty;
-  s.addEventListener("input", () => { set(s.textContent); changed(); });
-  s.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); s.blur(); } });
-  s.addEventListener("paste", e => { e.preventDefault(); document.execCommand("insertText", false, (e.clipboardData.getData("text") || "").replace(/\s*\n\s*/g, "")); });
-  if (opts.check) refreshers.push(() => s.classList.toggle("bad", !opts.check()));
-  return s;
-}
 function calc(fn) { const s = el("span", "calc"); const r = () => { s.textContent = fn(); }; r(); refreshers.push(r); return s; }
+function xBtn(title, fn) { const b = el("button", "x", "×"); b.type = "button"; b.title = title; b.setAttribute("aria-label", title); b.addEventListener("click", fn); return b; }
 function ui(text, fn, title) { const s = el("span", "ui", text); if (title) s.title = title; s.addEventListener("click", fn); return s; }
-function addLink(text, fn) { const d = el("div", "add ui", "＋ " + text); d.addEventListener("click", fn); doc.append(d); }
 
 function planOk(x) {
   if (x.plan === "X") return true;
   const p = mmddToDate(x.plan, DAY); return !!p && p > DAY;
 }
 
-function itemLine(list, x, withCat) {
-  const touch = () => { x.edited = today(); };
-  const sign = calc(() => x.edited === today() ? "+" : "-");
-  const parts = [sign, ed(() => x.start, v => { x.start = v.trim(); touch(); }, "日期")];
-  if (withCat) {
-    const sel = el("select");
-    CATS.forEach(c => { const o = el("option", "", c ? c + "：" : "＋类别"); o.value = c; sel.append(o); });
-    sel.value = x.cat; sel.dataset.out = "cat"; fitSelect(sel);
-    sel.addEventListener("change", () => { x.cat = sel.value; fitSelect(sel); touch(); changed(); });
-    parts.push(sel);
-  }
-  const text = ed(() => x.text, v => { x.text = v; touch(); }, "事项");
-  parts.push(text);
-  const plan = ed(() => x.plan, v => {
-    x.plan = v.trim().toUpperCase() === "X" ? "X" : v.trim();
-    x.closed = x.plan === "X" ? today() : ""; touch();
-  }, "计划", { check: () => planOk(x) });
-  plan.title = "计划日期 MMDD（要晚于今天）；写 X = 结束，第二天自动删除";
-  parts.push(plan);
-  const L = line(...parts);
-  L.append(ui("今日更新", () => {
-    if (!x.text.includes(T())) { x.text = x.text.replace(/[，,]$/, "") + "，" + T(); text.textContent = x.text; }
-    touch(); changed(); text.focus(); placeEnd(text);
-  }, "在事项后面加上今天的日期，再写今天做了什么"));
-  L.append(ui("删除", () => { if (confirm("删除这一条？")) { list.splice(list.indexOf(x), 1); render(); save(); } }));
-  refreshers.push(() => L.classList.toggle("closed", x.plan === "X"));
-}
-function items(list, withCat) {
-  list.filter(alive).forEach(x => itemLine(list, x, withCat));
-  addLink("事项", () => { list.push(it(T(), "", "", "", true)); render(); save(); });
-}
-// a select as wide as its chosen text, so it reads like the copied line ("＋类别" = no category, not copied)
-function fitSelect(sel) { sel.style.width = sel.options[sel.selectedIndex].text.length + 0.2 + "em"; sel.classList.toggle("none", sel.value === ""); }
-function placeEnd(n) { const r = document.createRange(); r.selectNodeContents(n); r.collapse(false); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
-
 // Hours are written the group leader's way: 4h15 = 4 hours 15 minutes, 4h = 4 hours, "+"/"-" at the end.
-// Typing 1.5, 1.5h, 1:30, 90m or 1h30 all mean the same; the box is tidied to 1h30 when you leave it.
+// parseHours only reads old typed journals; new hours come from the time entries.
 function parseHours(text) {
   let t = (text || "").replace(/\s+/g, "").replace(/小时|時|H/g, "h").replace(/分钟|分|min/g, "m").replace(/：/g, ":");
   const sign = (t.match(/[+-](?=[^+-]*$)/) || [""])[0]; t = t.replace(/[+-]/g, "");
@@ -398,8 +426,8 @@ function parseHours(text) {
 }
 function fmtHours(min, sign) { const h = Math.floor(min / 60), m = min % 60; return h + "h" + (m ? String(m).padStart(2, "0") : "") + (sign || ""); }
 function tidyHours(text) { const p = parseHours(text); return p && text.trim() ? fmtHours(p.min, p.sign) : text; }
-// Time is entered as a list of entries (category, what, hours, minutes), like a timesheet app;
-// the @ lines are written from them. Old journals (typed hours) are turned into entries once.
+// Time is entered as a list of entries (category, what, hours, minutes), like a timesheet app.
+// Old journals (typed hours) are turned into entries once.
 function migrateHours() {
   if (S.entries) return;
   S.entries = S.hours.flatMap((h, i) => { const p = parseHours(h.h); return p && p.min ? [{ cat: i, text: h.note || "", min: p.min, sign: p.sign }] : []; });
@@ -416,12 +444,130 @@ function noteOf(es) {
 }
 function hoursTotal() { return sumOf(S.entries); }
 
-const hoursEl = document.getElementById("hours");
-function renderHours() {
-  hoursEl.innerHTML = "";
-  const head = el("div", "hhead"); head.append(el("b", "", "今日工时 "), calc(hoursTotal));
-  hoursEl.append(head);
-  const opt = (sel, v, t) => { const o = el("option", "", t); o.value = v; sel.append(o); };
+// ---------- client quantities (rules 10, 11) ----------
+// Per product line: pairs ORDERED per business year (l.orders, by year code like "226"), plus
+// 未出 (ordered, not shipped yet: 后道 and 前后道 clients) and 估 (more pairs expected this year: 前道 and 前后道).
+// The business year runs Nov-Oct; the page always shows last / this / next year, so the
+// "delete the year before last on 31 Oct" rule happens by itself.
+const QTY_RE = /\d{3}\s*(单|未出)|未出\s*\d|估\s*\d/;
+function migrateQty(l) {
+  if (l.orders) return;
+  l.orders = {}; l.est = ""; l.unshipped = "";
+  const t = l.qty || "";
+  for (const m of t.matchAll(/(\d{3})\s*单\s*(\d+)\s*双/g)) l.orders[m[1]] = m[2];
+  const u = t.match(/未出\s*(\d+)/); if (u) l.unshipped = u[1];
+  const e = t.match(/估\s*(\d+)/); if (e) l.est = e[1];
+  if (t.trim() && !Object.keys(l.orders).length && !u && !e) l.qtyOld = t;   // couldn't read it: shown as a hint
+  l.qty = "";
+}
+function migrateClients() {
+  S.clients.forEach(c => {
+    // a quantity line that an old import took for a product line: give it back to the line above
+    for (let i = c.lines.length - 1; i > 0; i--) {
+      const l = c.lines[i];
+      if (QTY_RE.test(l.product) && !l.orders) { const up = c.lines[i - 1]; up.qty = (up.qty || "") + "；" + l.product + (l.qty ? "；" + l.qty : ""); up.items.push(...l.items); c.lines.splice(i, 1); }
+    }
+    c.lines.forEach(migrateQty);
+  });
+}
+const curYear = () => +bizYear(DAY);
+function qtyText(c, l) {
+  const y = curYear(), o = l.orders || {}, n = v => (v === "" || v == null ? "0" : v);
+  if (c.role === "后") return y + "未出" + n(l.unshipped) + "双";
+  let t = (y - 1) + "单" + n(o[y - 1]) + "双；" + y + "单" + n(o[y]) + "双";
+  if (c.role === "前后") t += "，未出" + n(l.unshipped) + "双";
+  if (o[y + 1]) t += "，" + (y + 1) + "单" + o[y + 1] + "双";
+  return t + "，估" + n(l.est) + "双";
+}
+function qtyBad(c, l) {
+  if (c.role !== "前" && (l.unshipped ?? "") === "") return "未出没填";
+  if (c.role !== "后" && (l.est ?? "") === "") return "估没填";
+  return "";
+}
+
+// ---------- the journal text: one {t, bad} per line; bad = why the line still needs work ----------
+const LINE1 = "--------------------------------------------------------------------------------------";
+const LINE2 = "-----------------------------------------------------";
+function itemText(x, withCat) { return (x.edited === today() ? "+" : "-") + x.start + (withCat && x.cat ? x.cat + "：" : "") + x.text.trim() + x.plan; }
+function itemBad(x) { return !x.text.trim() ? "事项没写内容" : planOk(x) ? "" : "计划日期要晚于今天"; }
+function specText(spec) {
+  let bad = "";
+  const t = spec.map(p => {
+    if (typeof p === "string") return p;
+    if (p.d) return T();
+    if (p.w) return mmdd(fromIso(S.weekDate));
+    if (p.c) return String(calcValue(p.c));
+    const v = (S.f[p.f] || "").trim(); if (!v) bad = "有空没填"; return v;
+  }).join("");
+  return { t, bad };
+}
+function genLines() {
+  const L = [], add = (t, bad = "") => L.push({ t, bad });
+  const items = (list, withCat) => list.filter(alive).forEach(x => add(itemText(x, withCat), itemBad(x)));
+  HOUR_LABELS.forEach((label, i) => { const es = S.entries.filter(e => e.cat === i), n = noteOf(es); add("@" + label + " " + sumOf(es) + (n ? "（" + n + "）" : "")); });
+  add("@总计" + hoursTotal(), S.entries.length ? "" : "今日工时还没填");
+  add("▲每日回顾：");
+  DAILY.forEach(sp => { const r = specText(sp); add(r.t, r.bad); });
+  add("▲提醒：本周第" + isoWeek(DAY) + "周");
+  items(S.remind, false);
+  add("▲持续关注(客户工厂投诉/欠包装/测试未过/进度核对/船期预警/品质难点/会议/其他等跟踪)：");
+  items(S.focus, true);
+  add(LINE1);
+  add("●●每周回顾：以下统计值每周5更新：" + mmdd(fromIso(S.weekDate)) + "更新");
+  WEEKLY.forEach(sp => { const r = specText(sp); add(r.t, r.bad); });
+  add("●C1有单老客：" + S.clients.length + "客");
+  S.clients.forEach(c => c.lines.forEach((l, i) => {
+    const lonely = c.role !== "后" && !l.items.filter(alive).length ? "前道每条产品线至少要一条跟踪事项" : "";
+    add((i === 0 ? c.name + c.role + " " : "") + l.product, i === 0 && !c.name ? "客户简称没填" : lonely);
+    add(qtyText(c, l), qtyBad(c, l));
+    items(l.items, false);
+  }));
+  add("●C1无单老客/C1新客：" + S.c1none.filter(alive).length + "客");
+  items(S.c1none, false);
+  add("●C2目标客：" + S.c2.filter(alive).length + "客");
+  items(S.c2, false);
+  add(LINE2);
+  add("●备忘：");
+  add("*日常清单表：若有新的记录生成或有记录完成了，需当天传递；");
+  add("*日常清单表：若有未完成的记录，无论有无更新，每周一传递；");
+  return L;
+}
+function journalText() { return genLines().map(l => l.t).join("\r\n"); }
+function renderPreview() {
+  doc.innerHTML = "";
+  const lines = genLines();
+  lines.forEach(l => { const d = el("div", "line" + (l.bad ? " badline" : ""), l.t || " "); if (l.bad) d.title = l.bad; doc.append(d); });
+  const n = lines.filter(l => l.bad).length;
+  const c = document.getElementById("badCount");
+  c.textContent = n ? "　" + n + " 行还要处理（红色，鼠标放上去看原因）" : "　全部填好了";
+  c.classList.toggle("bad", n > 0);
+}
+
+// ---------- the form ----------
+function section(title, hint, parent = form) {
+  const s = el("section", "fsec"); s.append(el("h3", "", title));
+  if (hint) s.append(el("p", "hint", hint));
+  parent.append(s); return s;
+}
+function autosize(t) { const f = () => { t.style.height = "auto"; t.style.height = t.scrollHeight + 2 + "px"; }; t.addEventListener("input", f); setTimeout(f); return f; }
+function textBox(get, set, ph, multi) {
+  const t = el(multi ? "textarea" : "input"); t.value = get(); t.placeholder = ph || "";
+  if (multi) { t.rows = 1; autosize(t); }
+  t.addEventListener("input", () => { set(t.value); changed(); });
+  return t;
+}
+function addButton(text, fn) { const b = el("button", "addbtn", "＋ " + text); b.addEventListener("click", fn); return b; }
+const opt = (sel, v, t) => { const o = el("option", "", t); o.value = v; sel.append(o); };
+
+// 今日工时
+function hoursSection() {
+  const sec = section("今日工时", "每做一件事加一条：选类别，写做了什么，选时间。日志里的 @ 行和总计自动算。");
+  sec.querySelector("h3").append("　", calc(hoursTotal));
+  if (S.entries.length) {   // the column names once, not in every row
+    const cap = el("div", "hrow hcap");
+    cap.append(el("span", "hc", "类别"), el("span", "grow", "做了什么"), el("span", "hn", "小时"), el("span", "hn", "分钟"), el("span", "hs", "多/少一点"), el("span", "hx"));
+    sec.append(cap);
+  }
   S.entries.forEach(e => {
     const row = el("div", "hrow");
     const cat = el("select"); HOUR_LABELS.forEach((l, i) => opt(cat, i, l)); cat.value = e.cat;
@@ -431,32 +577,324 @@ function renderHours() {
     if (e.min % 5) opt(m, e.min % 60, String(e.min % 60).padStart(2, "0"));
     h.value = Math.floor(e.min / 60); m.value = e.min % 60;
     const sg = el("select"); opt(sg, "", "　"); opt(sg, "+", "+ 多一点"); opt(sg, "-", "- 少一点"); sg.value = e.sign;
-    const del = el("button", "", "删除");
+    const del = xBtn("删除这一条", () => { S.entries.splice(S.entries.indexOf(e), 1); renderForm(); changed(); });
+    cat.className = "hc"; h.className = m.className = "hn"; sg.className = "hs";
     const check = () => row.classList.toggle("bad", !(e.min > 0) || !e.text.trim());
     const upd = () => { e.cat = +cat.value; e.text = text.value; e.min = +h.value * 60 + +m.value; e.sign = sg.value; check(); changed(); };
     [cat, h, m, sg].forEach(x => x.addEventListener("change", upd)); text.addEventListener("input", upd);
-    del.addEventListener("click", () => { S.entries.splice(S.entries.indexOf(e), 1); renderHours(); changed(); });
-    row.append(cat, text, h, "小时", m, "分", sg, del); check();
-    hoursEl.append(row);
+    row.append(cat, text, h, m, sg, del); check();
+    sec.append(row);
   });
-  const add = el("button", "", "＋ 加一条");
-  add.addEventListener("click", () => {
+  sec.append(addButton("加一条", () => {
     const last = S.entries[S.entries.length - 1];
     S.entries.push({ cat: last ? last.cat : 0, text: "", min: 30, sign: "" });
-    renderHours(); changed(); hoursEl.querySelectorAll(".hrow input")[S.entries.length - 1].focus();
-  });
-  hoursEl.append(add);
+    renderForm(); changed(); const ins = sec.ownerDocument.querySelectorAll(".hrow input"); ins[ins.length - 1].focus();
+  }));
 }
 
-const prevF = k => (S.prev && S.prev.f && S.prev.f[k]) || "…";
-function specLine(spec) {
-  return line(...spec.map(p => {
-    if (typeof p === "string") return p;
-    if (p.d) return calc(() => T());
-    if (p.w) return calc(() => mmdd(fromIso(S.weekDate)));
-    if (p.c) return calc(() => calcValue(p.c));
-    return ed(() => S.f[p.f] || "", v => { S.f[p.f] = v; }, prevF(p.f), { check: () => (S.f[p.f] || "").trim() !== "" });
-  }));
+// plain-language names for the boxes of the fixed lines; [label, hint]
+const FIELD_HELP = {
+  d2: ["接单/出货系统还没更新的", "按这三项写：已接单未入系统 / 已接单未交接后道 / 已出货未更新系统（客户/款数/数量，原因，计划日期）"],
+  d3: ["手上要下样、还没下样的款", "款数：哪个客户几款，打算怎么办 + 计划日期"],
+  d4: ["今天的客户投诉", "/条数, 知会QC/QA：条数；阿文确认收到：条数"],
+  w1: ["本周工厂意见/投诉"], w2: ["本周搜款推客", "/几个客 客户/款数，下周计划"], w3: ["本周来联系我们的C2C3C4客/新客"],
+  w4a: ["C1客户数（系统里）"], w4b: ["C2客户数（系统里）"], w4c: ["与系统客户总表校对", "接在后面，如 ；与系统客户总表校对时点：1017/14:30完成"],
+  w5: ["未结账务"], w6: ["已投产欠包装", "款数，如 款1"], w7: ["测试未过", "款数，如 款1"],
+  w8a: ["进度核对 条数"], w8b: ["船期预警 条数"], w9: ["品质关注点", "如 需关注点2"],
+  w10a: ["待开客户会议/来访", "如 客1"], w10b: ["会议后面的内容", "如 ，系统客户来访待开会议数1；系统更新自评：5"],
+  w11: ["本周入系统订单款数"], w12: ["系统在手设计稿-业务模块"], w13: ["本周下样数"], w14: ["未完试样单数"],
+  w15a: ["本周超30天样单数"], w15b: ["本周本人做了哪些推动工作/自评"],
+};
+let EXAMPLE = null;   // the template's example values, shown in empty boxes
+function specFields(sec, spec) {
+  EXAMPLE ||= seed().f;
+  const g = el("div", "fgroup");
+  spec.filter(p => p.f).forEach(p => {
+    const [label, hint] = FIELD_HELP[p.f] || [p.f];
+    const prev = S.prev && S.prev.f && S.prev.f[p.f];
+    const f = el("label", "field"); f.append(el("span", "flabel", label));
+    const box = textBox(() => S.f[p.f] || "", v => { S.f[p.f] = v; }, prev ? "上次：" + prev : "例：" + (EXAMPLE[p.f] || ""), true);
+    refreshers.push(() => box.classList.toggle("bad", !(S.f[p.f] || "").trim()));
+    f.append(box);
+    if (prev) {
+      const same = el("button", "same", "用上次的");
+      same.addEventListener("click", e => { e.preventDefault(); S.f[p.f] = prev; box.value = prev; box.dispatchEvent(new Event("input")); });
+      f.append(same);
+    }
+    if (hint) f.append(el("span", "hint", hint));
+    g.append(f);
+  });
+  const out = el("div", "fout"); out.append("→ ", calc(() => specText(spec).t)); g.append(out);
+  sec.append(g);
+}
+
+// one tracked item (持续关注, client, reminder)
+function itemCard(list, x, withCat) {
+  const card = el("div", "icard");
+  const touch = () => { x.edited = today(); };
+  const top = el("div", "irow");
+  if (withCat) {
+    const sel = el("select"); CATS.forEach(c => opt(sel, c, c || "其他")); sel.value = x.cat;
+    sel.addEventListener("change", () => { x.cat = sel.value; touch(); changed(); });
+    top.append(sel);
+  }
+  const text = textBox(() => x.text, v => { x.text = v; touch(); }, "发生了什么、做了什么、打算怎么办", true);
+  // the sign this item gets in the journal: + changed today, - not, X finished
+  const sign = el("span", "sign");
+  refreshers.push(() => {
+    const s = x.plan === "X" ? "X" : x.edited === today() ? "+" : "-";
+    sign.textContent = s; sign.dataset.s = s;
+    sign.title = s === "X" ? "已结束，明天从日志删除" : s === "+" ? "今天改过，日志里是 +" : "今天没改，日志里是 -";
+  });
+  top.prepend(sign); top.append(text);
+  const bottom = el("div", "irow small");
+  const start = el("input", "short"); start.value = x.start; start.placeholder = "入日志"; start.title = "入日志的日期（MMDD），或 W43 这样的周数";
+  start.addEventListener("input", () => { x.start = start.value.trim(); touch(); changed(); });
+  const plan = el("input"); plan.type = "date";
+  const tomorrow = new Date(DAY); tomorrow.setDate(tomorrow.getDate() + 1); plan.min = iso(tomorrow); plan.title = "计划日期（要晚于今天）";
+  const pd = mmddToDate(x.plan, DAY); if (pd) plan.value = iso(pd);
+  plan.addEventListener("change", () => { if (plan.value) { x.plan = mmdd(fromIso(plan.value)); x.closed = ""; touch(); changed(); } });
+  const upd = el("button", "", "今日更新");
+  upd.title = "在后面加上今天的日期，接着写今天做了什么";
+  upd.addEventListener("click", () => {
+    if (!x.text.includes(T())) { x.text = x.text.replace(/[，,\s]+$/, "") + "，" + T(); text.value = x.text; }
+    touch(); changed(); text.focus(); text.setSelectionRange(text.value.length, text.value.length); text.dispatchEvent(new Event("input"));
+  });
+  const end = el("button", "", x.plan === "X" ? "恢复" : "结束");
+  end.title = "结束 = 计划日期写 X，明天自动从日志删除";
+  end.addEventListener("click", () => {
+    if (x.plan === "X") { x.plan = ""; x.closed = ""; } else { x.plan = "X"; x.closed = today(); }
+    touch(); renderForm(); changed();
+  });
+  const del = xBtn("删除这一条", () => { if (confirm("删除这一条？")) { list.splice(list.indexOf(x), 1); renderForm(); changed(); } });
+  bottom.append(start, el("span", "arrow", "→"), x.plan === "X" ? el("b", "", "X") : plan, upd, end);
+  card.append(top, bottom, del);
+  refreshers.push(() => { card.classList.toggle("bad", !!itemBad(x)); card.classList.toggle("closed", x.plan === "X"); });
+  return card;
+}
+function itemList(sec, list, withCat) {
+  list.filter(alive).forEach(x => {
+    const card = itemCard(list, x, withCat);
+    if (list === S.c1none) {
+      const mv = el("button", "", "已下单 → 移到C1有单老客");
+      mv.addEventListener("click", () => {
+        const name = (x.text.match(/[A-Z][A-Z0-9]{2,3}/) || [""])[0], role = (x.text.match(/前后|前|后/) || ["前"])[0];
+        list.splice(list.indexOf(x), 1);
+        S.clients.push({ name, role, lines: [{ product: "", qty: "", orders: {}, est: "", unshipped: "", items: [x] }] });
+        renderForm(); changed(); toast("已移到 C1有单老客，请填产品线和数量");
+      });
+      card.querySelector(".irow.small").append(mv);
+    }
+    sec.append(card);
+  });
+  sec.append(addButton("新事项", () => { list.push(it(T(), "", "", "", true)); renderForm(); changed(); const ts = sec.querySelectorAll(".icard textarea"); ts[ts.length - 1].focus(); }));
+}
+
+
+// ---------- client numbers from the old system (客户总表) ----------
+// Bookmark 「复制客户数量」: run on the old system's 客户总表 page, it reads the client table and
+// copies each client's pairs per product line (沙滩鞋, 室内鞋...) as text; 「粘贴系统数量」 in the
+// C1有单老客 section fills them in. The clipboard is the way across: the old system and this
+// page are different sites. Columns are found by their titles, never by position. It changes
+// nothing on the old system's page. Kept as a function here so the bookmark link is made from
+// this code (comments only on lines of their own, like every bookmark).
+function erpClientsBookmark() {
+  var tables = document.querySelectorAll("table"), grid = null, heads = [];
+  for (var t = 0; t < tables.length && !grid; t++) {
+    var row = tables[t].rows[0];
+    if (!row) continue;
+    var hs = [];
+    for (var c = 0; c < row.cells.length; c++) hs.push(row.cells[c].textContent.replace(/\s+/g, ""));
+    if (hs.indexOf("客户简称") >= 0 && hs.indexOf("已接定单数量") >= 0 && hs.indexOf("年度") >= 0) { grid = tables[t]; heads = hs; }
+  }
+  var say = function (html, ok) {
+    var old = document.getElementById("journal-clients-box");
+    if (old) old.remove();
+    var box = document.createElement("div");
+    box.id = "journal-clients-box";
+    box.style.cssText = "position:fixed;top:8px;right:8px;z-index:99999;background:#fff;color:#000;border:2px solid " + (ok ? "#2b8a3e" : "#d2433a") + ";padding:8px 12px;font:14px sans-serif;box-shadow:0 2px 8px #0004;max-width:420px";
+    box.innerHTML = html + "<div style='text-align:right'><a href='#' id='journal-clients-x'>关闭</a></div>";
+    document.body.appendChild(box);
+    document.getElementById("journal-clients-x").onclick = function () { box.remove(); return false; };
+    return box;
+  };
+  if (!grid) { say("没找到客户表。请在旧系统的 <b>客户总表</b> 页面点这个书签。", false); return; }
+  var col = function (title, from) { return heads.indexOf(title, from || 0); };
+  var num = function (cells, i) {
+    if (i < 0 || !cells[i]) return 0;
+    var v = parseInt(cells[i].textContent.replace(/[,\s]/g, ""), 10);
+    return isNaN(v) ? 0 : v;
+  };
+  // product lines: every column group titled <产品>已接定单数量
+  var products = [];
+  for (var h = 0; h < heads.length; h++) {
+    var m = heads[h].match(/^(.+)已接定单数量$/);
+    if (!m) continue;
+    var first = col(m[1] + "低估定单数量");
+    if (first < 0) first = h - 10;
+    products.push({ name: m[1], ordered: h, last: col("去年定单数量", first), made: col(m[1] + "已投产未出数"),
+      waiting: col(m[1] + "已接未投产数"), est: col(m[1] + "预估未下单数") });
+  }
+  var nameCol = col("客户简称"), yearCol = col("年度"), clients = [], year = 0;
+  for (var r = 1; r < grid.rows.length; r++) {
+    var cells = grid.rows[r].cells;
+    if (cells.length < heads.length) continue;
+    var name = cells[nameCol].textContent.replace(/\s+/g, "").toUpperCase();
+    if (!name) continue;
+    year = year || num(cells, yearCol);
+    var lines = [];
+    for (var p = 0; p < products.length; p++) {
+      var P = products[p];
+      lines.push({ product: P.name, last: num(cells, P.last), ordered: num(cells, P.ordered),
+        unshipped: num(cells, P.made) + num(cells, P.waiting), est: num(cells, P.est) });
+    }
+    clients.push({ name: name, lines: lines });
+  }
+  if (!clients.length || !products.length) { say("客户表里没读到数量。", false); return; }
+  var text = JSON.stringify({ kind: "journal-clients-v1", year: year, at: new Date().toLocaleString(), clients: clients });
+  var box = say("已读到 <b>" + clients.length + "</b> 个客户（" + year + " 年度）。<br><small>现在到日志页面，在 C1有单老客 按「粘贴系统数量」。</small><br><textarea id='journal-clients-text' readonly style='width:100%;height:40px;font-size:11px'></textarea><small id='journal-clients-how'></small>", true);
+  var ta = document.getElementById("journal-clients-text");
+  ta.value = text; ta.focus(); ta.select();
+  var done = false;
+  try { done = document.execCommand("copy"); } catch (e) {}
+  document.getElementById("journal-clients-how").textContent = done ? "已经复制好了。" : "没能自动复制：请在上面的框里按 Ctrl+C。";
+}
+const bookmarkHref = fn => "javascript:" + encodeURIComponent("(" + fn.toString().split("\n").filter(l => !/^\s*\/\//.test(l)).join("\n") + ")();");
+
+// Fill the C1 clients from the copied numbers. Only clients already in the journal (matched by
+// 简称) are filled; a product line with no order last year or this year is left out.
+const CHG = new WeakMap();   // line -> { box key: old value }, to frame what the paste changed (until the page is reloaded)
+function applyClientNumbers(text) {
+  let d; try { d = JSON.parse(text); } catch (e) { d = null; }
+  if (!d || d.kind !== "journal-clients-v1") return { error: "这不是「复制客户数量」书签复制的内容。先在旧系统的客户总表页面点书签，再回来按这里。" };
+  const y = 200 + d.year % 100;
+  if (y !== curYear()) return { error: `系统页面是 ${d.year} 年度，日志现在是 ${curYear()} 年度：请在客户总表选对年度再复制。` };
+  const by = {}; d.clients.forEach(c => { by[c.name] = c; });
+  const res = { filled: [], missing: [], added: [], extra: [] };
+  const names = d.clients.flatMap(c => c.lines.map(l => l.product));
+  S.clients.forEach(c => {
+    const src = by[(c.name || "").trim().toUpperCase()];
+    if (!src) { res.missing.push(c.name || "（没写简称）"); return; }
+    const want = src.lines.filter(l => l.last > 0 || l.ordered > 0);
+    const used = new Set();
+    want.forEach(w => {
+      // the journal line of this product: same name, else a line not named after a system product yet, else a new one
+      let l = c.lines.find(x => x.product === w.product);
+      if (!l) { l = c.lines.find(x => !used.has(x) && !names.includes(x.product)); if (l) l.product = w.product; }
+      if (!l) { l = { product: w.product, qty: "", orders: {}, est: "", unshipped: "", items: [] }; c.lines.push(l); res.added.push(c.name + " " + w.product); }
+      used.add(l);
+      const chg = {}, set = (key, old, v, put) => { if ((old ?? "") !== v) chg[key] = old ?? ""; put(v); };
+      l.orders ||= {};
+      set("o" + (y - 1), l.orders[y - 1], String(w.last), v => { l.orders[y - 1] = v; });
+      set("o" + y, l.orders[y], String(w.ordered), v => { l.orders[y] = v; });
+      set("u", l.unshipped, String(w.unshipped), v => { l.unshipped = v; });
+      set("e", l.est, String(w.est), v => { l.est = v; });
+      CHG.set(l, chg);
+    });
+    c.lines.filter(x => !used.has(x)).forEach(x => res.extra.push(c.name + " " + (x.product || "（没写产品线）")));
+    res.filled.push(c.name);
+  });
+  return res;
+}
+function pasteClientNumbers() {
+  const run = text => {
+    const r = applyClientNumbers(text);
+    if (r.error) { alert(r.error); return; }
+    renderForm(); changed();
+    const parts = ["已填 " + r.filled.length + " 个客户" + (r.filled.length ? "：" + r.filled.join("、") : "")];
+    if (r.added.length) parts.push("新加的产品线（前道要各写一条跟踪事项）：" + r.added.join("、"));
+    if (r.extra.length) parts.push("系统里今年去年都没单、没动的产品线：" + r.extra.join("、"));
+    if (r.missing.length) parts.push("系统页面上没找到：" + r.missing.join("、") + "（简称不一样，或没显示在客户总表里）");
+    if (!S.clients.length) parts.push("日志里还没有客户：先按「＋ 客户」写上简称，再粘贴。");
+    alert(parts.join("\n\n") + "\n\n改过的格子有蓝框，鼠标放上去看原来的数。");
+  };
+  const ask = () => { const t = prompt("浏览器不让直接读剪贴板：请在这里按 Ctrl+V，再按确定。"); if (t) run(t); };
+  if (navigator.clipboard && navigator.clipboard.readText) navigator.clipboard.readText().then(run, ask); else ask();
+}
+
+function clientsSection() {
+  const sec = section("C1有单老客", "每个客户：简称（4位）、前道/后道，每条产品线写各业务年度数量，下面加跟踪事项（前道每条产品线至少一条）。");
+  // numbers from the old system: paste button + the bookmark that copies them there
+  const sys = el("div", "irow sysrow");
+  const paste = el("button", "", "粘贴系统数量"); paste.title = "把「复制客户数量」书签复制的数量，填进下面简称对得上的客户";
+  paste.addEventListener("click", pasteClientNumbers);
+  const bm = el("a", "bm", "复制客户数量"); bm.href = bookmarkHref(erpClientsBookmark);
+  bm.title = "把这个拖到浏览器的书签栏。以后在旧系统的 客户总表 页面点它。";
+  bm.addEventListener("click", e => { e.preventDefault(); toast("把它拖到书签栏，然后在旧系统的 客户总表 页面点它"); });
+  sys.append(paste, el("span", "hint", "数量不用手抄：把书签"), bm, el("span", "hint", "拖到书签栏，在旧系统「客户总表」页面点它，再回来按「粘贴系统数量」。"));
+  sec.append(sys);
+  S.clients.forEach(c => {
+    const card = el("div", "ccard");
+    const head = el("div", "irow");
+    const name = el("input", "short"); name.value = c.name; name.placeholder = "简称";
+    name.addEventListener("input", () => { c.name = name.value.trim(); changed(); });
+    const role = el("select"); [["前", "前道"], ["前后", "前后道"], ["后", "后道"]].forEach(([v, t]) => opt(role, v, t)); role.value = c.role;
+    role.addEventListener("change", () => { c.role = role.value; renderForm(); changed(); });
+    const delC = xBtn("删除客户", () => { if (confirm("删除客户 " + c.name + "？")) { S.clients.splice(S.clients.indexOf(c), 1); renderForm(); changed(); } });
+    name.title = "客户简称（4位）"; role.title = "前道 / 前后道 / 后道";
+    head.append(name, role);
+    card.append(head, delC);
+    c.lines.forEach((l, i) => {
+      const pl = el("div", "pline");
+      const r1 = el("div", "irow");
+      const prod = el("input", "prod"); prod.value = l.product; prod.placeholder = "产品线（如 鞋1）";
+      prod.addEventListener("input", () => { l.product = prod.value.trim(); changed(); });
+      r1.append(prod);
+      if (c.lines.length > 1) { const d = xBtn("删除产品线", () => { if (confirm("删除这条产品线？")) { c.lines.splice(i, 1); renderForm(); changed(); } }); pl.append(d); }
+      pl.append(r1);
+      // pairs: number boxes, which ones depends on 前/后
+      const y = curYear(), r2 = el("div", "irow qty");
+      const num = (label, get, set, tip, key) => {
+        const w = el("label", "num"), b = el("input"); b.inputMode = "numeric"; b.value = get() ?? ""; b.placeholder = "双数";
+        if (tip) w.title = tip;
+        b.addEventListener("input", () => { set(b.value.replace(/[^\d]/g, "")); changed(); });
+        refreshers.push(() => b.classList.toggle("bad", b.dataset.req === "1" && (get() ?? "") === ""));
+        const was = (CHG.get(l) || {})[key];
+        if (was !== undefined) { b.classList.add("chg"); b.title = "从系统填的，原来是：" + (was === "" ? "空" : was); }
+        w.append(label, b); r2.append(w); return b;
+      };
+      r2.append(el("span", "qlabel", c.role === "后" ? "双数" : "下单双数"));
+      if (c.role !== "后") {
+        num(`${y - 1}年度`, () => l.orders[y - 1], v => { l.orders[y - 1] = v; }, "上个业务年度下单的双数", "o" + (y - 1));
+        num(`${y}年度`, () => l.orders[y], v => { l.orders[y] = v; }, "这个业务年度（11月-10月）到现在下单的双数", "o" + y);
+        num(`${y + 1}年度`, () => l.orders[y + 1], v => { l.orders[y + 1] = v; }, "下个业务年度已经下的单，没有就空着", "o" + (y + 1));
+      }
+      if (c.role !== "前") num("未出", () => l.unshipped, v => { l.unshipped = v; }, "这个业务年度已下单、还没出货的双数", "u").dataset.req = "1";
+      if (c.role !== "后") num("估", () => l.est, v => { l.est = v; }, "这个业务年度估计还会再下单的双数", "e").dataset.req = "1";
+      pl.append(r2);
+      if (l.qtyOld) pl.append(el("div", "hint", "以前写的（没读懂，请填进上面的格子）：" + l.qtyOld));
+      const out = el("div", "fout"); out.append("→ ", calc(() => qtyText(c, l))); pl.append(out);
+      itemList(pl, l.items, false);
+      card.append(pl);
+    });
+    card.append(addButton("产品线", () => { c.lines.push({ product: "", qty: "", orders: {}, est: "", unshipped: "", items: [] }); renderForm(); changed(); }));
+    sec.append(card);
+  });
+  sec.append(addButton("客户", () => { S.clients.push({ name: "", role: "前", lines: [{ product: "", qty: "", orders: {}, est: "", unshipped: "", items: [] }] }); renderForm(); changed(); }));
+}
+
+function renderForm() {
+  const y = window.scrollY;
+  refreshers = []; form.innerHTML = "";
+  hoursSection();
+
+  const daily = section("今天的数字", "每天早上会清空，灰色字是上次写的。");
+  const auto = el("div", "fout"); auto.append("组内日常清单表（从日常清单自动来）→ ", calc(() => specText(DAILY[0]).t)); daily.append(auto);
+  DAILY.slice(1).forEach(sp => specFields(daily, sp));
+
+  itemList(section("持续关注", "客诉、欠包装、测试未过、进度核对、船期预警、品质、会议等要跟踪的事。每条都要有计划日期（晚于今天）；今天改过的自动变 +。每条下面：入日志日期 → 计划日期。"), S.focus, true);
+  clientsSection();
+  itemList(section("C1无单老客 / C1新客", "以前下过单但近两年没单的客人，或新客。一旦下单，移到 C1有单老客。"), S.c1none, false);
+  itemList(section("C2目标客"), S.c2, false);
+  itemList(section("提醒", "如 W43 周一传未完日常清单表；新的一周第一天会自动换成新的周数。"), S.remind, false);
+
+  const wk = el("details", "fsec"); wk.open = DAY.getDay() === 5;
+  const sum = el("summary"); sum.append(el("b", "", "每周回顾"), "　上次更新 ", calc(() => mmdd(fromIso(S.weekDate))), "，每周五自动清空重写");
+  wk.append(sum); form.append(wk);
+  WEEKLY.forEach(sp => { const g = el("div", "wgroup"); g.append(el("div", "wtitle", sp[0].replace(/^\*|：$/g, ""))); specFields(g, sp); wk.append(g); });
+
+  refresh();
+  window.scrollTo(0, y);
 }
 
 function render() {
@@ -464,84 +902,15 @@ function render() {
   // drop items closed with X before today (rule 5)
   ["remind", "focus", "c1none", "c2"].forEach(k => { S[k] = S[k].filter(alive); });
   S.clients.forEach(c => c.lines.forEach(l => { l.items = l.items.filter(alive); }));
-  refreshers = []; doc.innerHTML = "";
-
-  // stored as "1.5+", shown as 1.5 h +, so the copy reads "1.5h+"
   migrateHours();
-  renderHours();
-  HOUR_LABELS.forEach((label, i) => {
-    const es = () => S.entries.filter(e => e.cat === i);
-    line("@" + label + " ", calc(() => sumOf(es())), calc(() => { const n = noteOf(es()); return n ? "（" + n + "）" : ""; }));
-  });
-  line("@总计", calc(hoursTotal));
-
-  line("▲每日回顾：");
-  DAILY.forEach(specLine);
-  line("▲提醒：本周第", calc(() => isoWeek(DAY)), "周");
-  items(S.remind, false);
-  line("▲持续关注(客户工厂投诉/欠包装/测试未过/进度核对/船期预警/品质难点/会议/其他等跟踪)：");
-  items(S.focus, true);
-  line("--------------------------------------------------------------------------------------");
-
-  line("●●每周回顾：以下统计值每周5更新：", calc(() => mmdd(fromIso(S.weekDate))), "更新");
-  WEEKLY.forEach(specLine);
-
-  line("●C1有单老客：", calc(() => S.clients.length), "客");
-  S.clients.forEach(c => {
-    c.lines.forEach((l, i) => {
-      const head = [];
-      if (i === 0) {
-        const role = el("select"); ["前", "前后", "后"].forEach(r => { const o = el("option", "", r); o.value = r; role.append(o); });
-        role.value = c.role; fitSelect(role); role.addEventListener("change", () => { c.role = role.value; fitSelect(role); changed(); });
-        head.push(ed(() => c.name, v => { c.name = v.trim(); }, "客户简称"), role, " ");
-      }
-      const L = line(...head, ed(() => l.product, v => { l.product = v.trim(); }, "产品线"));
-      if (i === 0) {
-        L.append(ui("加产品线", () => { c.lines.push({ product: "", qty: "", items: [] }); render(); save(); }));
-        L.append(ui("删除客户", () => { if (confirm("删除客户 " + c.name + "？")) { S.clients.splice(S.clients.indexOf(c), 1); render(); save(); } }));
-      } else {
-        L.append(ui("删除产品线", () => { if (confirm("删除这条产品线？")) { c.lines.splice(i, 1); render(); save(); } }));
-      }
-      line(ed(() => l.qty, v => { l.qty = v; }, "各业务年度数量"));
-      items(l.items, false);
-    });
-  });
-  addLink("客户", () => { S.clients.push({ name: "", role: "前", lines: [{ product: "", qty: "", items: [] }] }); render(); save(); });
-
-  line("●C1无单老客/C1新客：", calc(() => S.c1none.filter(alive).length), "客");
-  items(S.c1none, false);
-  line("●C2目标客：", calc(() => S.c2.filter(alive).length), "客");
-  items(S.c2, false);
-  line("-----------------------------------------------------");
-  line("●备忘：");
-  line("*日常清单表：若有新的记录生成或有记录完成了，需当天传递；");
-  line("*日常清单表：若有未完成的记录，无论有无更新，每周一传递；");
-
-  refresh();
+  migrateClients();
+  renderForm();
   save();
 }
 
-function refresh() { refreshers.forEach(r => r()); }
+function refresh() { refreshers.forEach(r => r()); renderPreview(); }
 let saveTimer;
 function changed() { refresh(); clearTimeout(saveTimer); saveTimer = setTimeout(save, 300); }
-
-// ---------- the text that gets copied = exactly what is on the page ----------
-function textOf(node) {
-  let out = "";
-  node.childNodes.forEach(n => {
-    if (n.nodeType === 3) { out += n.textContent; return; }
-    if (n.classList.contains("ui")) return;
-    if (n.tagName === "SELECT") { out += n.dataset.out === "cat" ? (n.value ? n.value + "：" : "") : n.value; return; }
-    let t = n.textContent;
-    if (t === "" && n.dataset.empty) t = n.dataset.empty;
-    if (n.classList.contains("wrap") && t !== "") t = "（" + t + "）";
-    out += t;
-  });
-  return out;
-}
-function journalText() {
-  return [...doc.querySelectorAll(".line")].map(textOf).join("\r\n");
-}
 
 async function copyText(t) {
   try { await navigator.clipboard.writeText(t); return true; } catch (e) {}
@@ -618,6 +987,7 @@ function parseJournal(raw) {
       const h = t.match(/^([A-Za-z0-9]+)\s*(前后|前|后)\s*(.*)$/);
       if (h) { client = { name: h[1], role: h[2], lines: [] }; s.clients.push(client); pl = { product: h[3], qty: "", items: [] }; client.lines.push(pl); read++; continue; }
       if (client && pl && !pl.qty && !pl.items.length) { pl.qty = t; read++; continue; }
+      if (client && pl && QTY_RE.test(t)) { pl.qty += "；" + t; read++; continue; }
       if (client) { pl = { product: t, qty: "", items: [] }; client.lines.push(pl); read++; continue; }
     }
     missed.push(t);
@@ -632,9 +1002,9 @@ dayInput.addEventListener("change", () => { if (!dayInput.value) return; DAY = f
 
 document.getElementById("copy").addEventListener("click", async () => {
   save();
-  const bad = doc.querySelectorAll(".bad").length;
+  const bad = genLines().filter(l => l.bad).length;
   const ok = await copyText(journalText());
-  toast(ok ? (bad ? "已复制。注意：有 " + bad + " 处红色要检查" : "已复制，可以粘贴了") : "复制失败，请用 以前的日志 里的文字");
+  toast(ok ? (bad ? "已复制。注意：有 " + bad + " 行还没填好（红色）" : "已复制，可以粘贴了") : "复制失败，请用 以前的日志 里的文字");
 });
 
 document.getElementById("week").addEventListener("click", () => {
@@ -681,6 +1051,12 @@ document.getElementById("import").addEventListener("change", async e => {
   e.target.value = "";
 });
 
+document.getElementById("prevToggle").addEventListener("click", e => {
+  const off = document.body.dataset.prev !== "off";
+  document.body.dataset.prev = off ? "off" : "";
+  e.target.textContent = off ? "显示日志文字" : "隐藏日志文字";
+});
+
 // the group's own example journal and rules, as written in the Word template
 const SAMPLE = "1@邮件回复 1h（MDC，TTT为主）\n@立项开发 1.5h（淘图0.5，整理集体图0.5，下样单0.5） \n@搜款推客0.5h (给HKM挑推30款0.5)\n@其他开发 1.5h+（找温州小凉鞋新工厂0.25,下样TRT 0.25，催样1+）\n@定单相关 1h-（MDC条码处理 0.5-， TTS货期沟通0.5）\n@单据 0.5h（TRT）\n@整样 0.5h（LFGW）\n@其他事务 0.75h (日志0.25，做卫生0.5)\n@总计7.25h+\n▲每日回顾：\n*组内日常清单表：1023当天接收4，当天完成3，未结2，传递：17：50已传\n*接单/出货系统更新：1023已接单未入系统：AAA/2款0.6W啥原因1029（仅前道业务）；已接单未交接后道：AAA/2款/客已下单2天（仅前道业务）；已出货未更新系统：AAA/2.5W 1029（仅后道业务）\n*在手需下样还未下样款数：1023款2：AAA款1，ABC款1，打算如何1029\n*客户投诉：1023/1条, 知会QC/QA：1条；阿文确认收到：1条，今入持续关注区登记客诉：1条\n▲提醒：本周第43周\n-W43周一传未完日常清单表，1020已传（或：1020无未完记录），下周1027\n▲持续关注(客户工厂投诉/欠包装/测试未过/进度核对/船期预警/品质难点/会议/其他等跟踪)：\n-1021客诉：某客投诉某事，已知会QC/QA，阿文已确认收到，1022如何如何1029\n+1023客诉：AAA如何如何，已知会QC/QA，阿文已确认收到1027\n+1023欠包装：AAA某厂1款，如何如何1030\n-1020测试未过：AAA某厂1款，如何如何1030\n-1017进度核对：ABC进度表发哪些QC，进度目前没有问题1024\n-1017进度核对：DDD进度表发哪些QC，进度目前没有问题1024\n-1020船期预警：ABC某某厂1W双客期1115交，1022做了啥，打算如何1029\n-1017品质：BBB某厂某材质，1021如何，1022如何1030\n+1020品质：某厂某材质如何，1023如何1028\n-0913会议：ABC某日来访，1020打算如何1029\n+1013会议：DDD10月23日15:00会议，1023如何如何X\n-1014某事如何，1022如何1029\n--------------------------------------------------------------------------------------\n●●每周回顾：以下统计值每周5更新：1017更新\n*本周工厂意见/投诉：1017投诉2，某厂投诉如何如何，某某厂投诉如何如何\n*本周搜款推客：1017/2客AAA/22款，BBB/50款，下周计划：1客CEC1024（仅前道业务）\n*本周来联系我们C2C3C4客/新客数：1017/2客，激活：1/某国DDD，新入系统：1/某国CENTE；系统更新自评：5（仅前道业务）\n*负责C1C2客户数：1017 C1日志4系统4, C2日志1系统1；与系统客户总表校对时点：1017/14:30完成（仅前道业务）\n*未结账务：1017如何如何\n*已投产欠包装：1017款1，持续关注区登记欠包装：1\n*测试未过：1017款1，持续关注区登记：1\n*进度核对/船期预警：1017进度核对2，船期预警1；持续关注区登记：进度核对2船期预警1\n*品质关注点：1017需关注点2，持续关注区登记品质：2\n*待开客户会议/来访：1017客1，持续关注区登记会议：1，系统客户来访待开会议数1；系统更新自评：5\n*本周入系统订单款数：1017款5，最久在手工作天数1天，入系统速度自评：5（）\n*系统在手设计稿-业务模块：1017已通过未下样数2，下样推进时效自评：4（如何如何）（仅有立项业务）\n*本周下样数：1017样3，最久在手工作天数1天，下样速度自评：5（）\n*未完试样单数：1017单3，无需试样备注描述合规自评：5\n*本周超30天样单数：1017：1单，上周2单；本周最久已下样119天；本周本人做了哪些推动工作/自评：1017如何如何/自评：4.5\n●C1有单老客：3客\nABC1前 鞋1 \n224单80532双；225单3000双，226单5000双，估105000双\n+1017啥事，1023做了啥，打算如何1028\n鞋2\n224单0双；225单8532双，估21300双\n-1010男段3款，1021如何，如何1030\n+1010女段2款，1023如何，如何1029\nABCM前后 鞋1 \n224单3000双；225单2000双，未出0双，226单3000双，估4000双\n-1017 如何如何，1021如何如何1030\nBBB后 鞋1\n225未出3000双\n+1023如何如何1029\n●C1无单老客/C1新客：1客\n-0430（英国FGD前）如何，0725寄样，0920如何如何1024\n●C2目标客：1客\n-0220（德国ADG）如何，0230如何，0630如何如何1110\n-----------------------------------------------------\n●备忘：\n*日常清单表：若有新的记录生成或有记录完成了，需当天传递；\n*日常清单表：若有未完成的记录，无论有无更新，每周一传递；\n\n————————————————————————————————————————\n规则：\n1)\t@开头9行为固化格式为当日工时分布登记及汇总。若有工时数值产生，需在（）内简注事类；若有多项事类，请注明每项时间。\n2）= 后面跟的日期都是每周回顾日期，事项末尾无需计划日期。\n3）# 为分类汇总符号，#后面日期为汇总统计日期，事项末尾无需计划日期。\n4) –后面跟的只有3种情况：A) 周缩写加周数，如“W11”，B)月缩写加月数，如“M12”，C）4位数值登记日期，该日期都是事项入日志那一天的日期，该事项未打x移除前，此开头日期都不改。\n5）–开头事项在事项末尾都需注明计划日期（该日期不是过去日期，也不是日志当天日期），直至事项末尾打X结束移除出日志为止。若不是刚入日志的事项，跟踪事项通常体现3个日期，除了开头和结尾各一个，中间还需一个登记最新操作的那个日期；-号开头的跟踪事项若当天有更新，需将-号改为+号；第二天若+号开头的记录若无继续更新，需将+号改为-号。\n6)\t持续关注区内与客诉/欠包装/测试未过/进度核对/船期预警/品质/会议相关记录都需在开头日期码后面加“类别：”标注，如：-1124客诉：某客如何如何1130\n7）若一个顶级客人下有多个不同简称客人，该客人所有简称都须用4位简称。\n8）已接单未入系统栏登记的订单都需是有具体数量的订单，无明确数量的订单预告不在此栏体现。\n9）界面整齐简洁，减少所有不必要的空格和空行。\n10) C1有单老客日志登记上一业务年度，当前业务年度和下一业务年度订单数值，若下一业务年度无订单数值，不用显示该业务年度信息。日志上的预估数量都是预估当前业务年度的未下单数量。每10月31日进入新的业务年度时，需将前前业务年度订单信息删除，如进入224业务年度，需将222业务年度订单信息删除。\n11）C1有单老客区：所有客户都需从“前/前后/后”这3个选项中选一个标注在客户简称后面，标前或前后的客户需做数量预估；带后的客户需统计本年度未出数量。\n12）C1无单老客/C1新客区：所有客户都需从“前/前后/后”这3个选项中选一个标注在客户简称后面。\n13）C1无单老客指以前下过订单，但当前业务年度和上一业务年度无订单的客人；C1无单老客或C1新客一旦下单，该客户记录就需移到C1有单老客区。\n14）C1有单老客区，前道业务负责每个客人每个产品线名下需至少有一条跟踪记录来登记与该客人该产品线的互动进展及计划情况。";
 document.getElementById("sample").addEventListener("click", () => { document.getElementById("sampleText").value = SAMPLE; document.getElementById("sampleDlg").showModal(); });
@@ -716,9 +1092,11 @@ const DEFAULT_XLSX = "UEsDBBQAAgAIALFAVl0DrDsgpAEAALIKAAATAAAAW0NvbnRlbnRfVHlwZX
 // A code is MMDD + letter + "-" + the day's number, anywhere in the message: 1019G-02, 1019-02.
 // The letter says who sent it. These are group B01's letters (other groups may differ): change only this table.
 // sheet = which 01 sheet of the Excel; row = which 02新增统计 row counts it.
+// The big boss is everyone's direct boss too: G (to the whole group) goes on the 直接上级 sheet,
+// no letter (to one person) on his own sheet, 01间接上级.
 const SOURCES = {
   "":  { name: "大老板",   sheet: "indirect", row: "B1" },
-  "G": { name: "大老板",   sheet: "indirect", row: "B1" },
+  "G": { name: "大老板(全组)", sheet: "direct", row: "A2" },
   "A": { name: "组长",     sheet: "direct",   row: "A1" },
   "Z": { name: "全组通知", sheet: "direct",   row: "A2" },
   "X": { name: "小组通知", sheet: "direct",   row: "A3" },
@@ -729,9 +1107,27 @@ const STAT_ROWS = [["A1", "A来自直接上级-单独通知"], ["A2", "A来自�
   ["B1", "B来自间接上级-单独通知"], ["B2", "B来自间接上级-全组大群通知"], ["B3", "B来自间接上级-组内组小群通知"], ["B", "B来自间接上级-汇总"]];
 const WORKDAYS = [1, 2, 3, 4, 5, 6];   // Mon..Sat get a number in 02新增统计 (0 when nothing came in)
 const TEMPLATE_KEY = "journal-xlsx-template";
+// the parts an Excel part points to (its .rels file), and a target path made absolute
+function partRels(B, file) { const r = file.replace(/([^/]+)$/, "_rels/$1.rels"); return B.get(r) ? [...xml(B.text(r)).getElementsByTagName("Relationship")] : []; }
+function partPath(from, t) { if (t.startsWith("/")) return t.slice(1); const parts = from.split("/").slice(0, -1); t.split("/").forEach(p => { if (p === "..") parts.pop(); else if (p !== ".") parts.push(p); }); return parts.join("/"); }
+// Excel comments of a sheet: row number -> text
+function sheetComments(B, sheet) {
+  const out = {};
+  partRels(B, sheet.file).filter(r => /\/comments$/.test(r.getAttribute("Type"))).forEach(r => {
+    const f = partPath(sheet.file, r.getAttribute("Target")); if (!B.get(f)) return;
+    [...xml(B.text(f)).getElementsByTagNameNS("*", "comment")].forEach(c => {
+      const row = +c.getAttribute("ref").replace(/^[A-Z]+/, ""), t = [...c.getElementsByTagNameNS("*", "t")].map(e => e.textContent).join("").trim();
+      if (t) out[row] = (out[row] ? out[row] + "\n" : "") + t;
+    });
+  });
+  return out;
+}
+// the kanban columns: the two 01 sheets, then one per F tracking sheet (its sheet name is the key)
+const LISTS = { direct: "直接上级", indirect: "间接上级 · 大老板" };
 
-// which 01 sheet an item goes on: the sheet it was imported from, else by its letter
+// which sheet an item goes on: the sheet it was imported from, else by its letter
 function sheetOf(x) { return x.sheet || (source(x.code) || {}).sheet || "direct"; }
+const isF = x => !LISTS[sheetOf(x)];
 function TD() {
   if (!S.todo) S.todo = { items: [], sends: [], statsBase: {} };
   // file name = your own part (editable) + "-" + today's date, e.g. 日常清单-B01组-15.Arthur-20261019.xlsx
@@ -740,15 +1136,26 @@ function TD() {
 }
 const fileDate = () => DAY.getFullYear() + T();
 const fileName = () => TD().fileBase.trim() + "-" + fileDate() + ".xlsx";
-function source(code) { const m = (code || "").match(CODE_RE); return m ? SOURCES[m[2]] : null; }
+function source(code) { const m = (code || "").trim().toUpperCase().match(CODE_RE); return m ? SOURCES[m[2]] : null; }
 function noteLines(x) { return x.notes.split("\n").map(l => l.trim()).filter(Boolean); }
 // 须知 5: OK = last note line ends with X; G = a note line starts with today's date; otherwise empty
 function status(x) {
   const ls = noteLines(x);
   if (ls.length && /[Xx]$/.test(ls[ls.length - 1])) return "OK";
+  if (x.keptOk) return "OK";      // closed in the imported file before the X rule: its 状态 column said OK
   return ls.some(l => l.startsWith(T())) ? "G" : "";
 }
 function planOf(x) { const ls = noteLines(x); const m = ls.length && ls[ls.length - 1].match(/(\d{4})$/); return m ? m[1] : ""; }
+// the plan date is the first such date on or after the day of the line it ends
+function planDate(x) {
+  const ls = noteLines(x), last = ls[ls.length - 1] || "", md = planOf(x);
+  if (!md || last.length <= 4) return null;
+  const from = pastDate(last.slice(0, 4), DAY) || DAY;
+  let d = new Date(from.getFullYear(), +md.slice(0, 2) - 1, +md.slice(2));
+  if (d.getMonth() !== +md.slice(0, 2) - 1) return null;
+  if (d < from) d = new Date(from.getFullYear() + 1, +md.slice(0, 2) - 1, +md.slice(2));
+  return d;
+}
 function syncOk(x) { const ok = status(x) === "OK"; if (ok && !x.xDate) x.xDate = today(); if (!ok) x.xDate = ""; }
 // MMDD -> the latest such date on or before ref (a code is never from the future)
 function pastDate(md, ref) {
@@ -759,17 +1166,41 @@ function pastDate(md, ref) {
   return d;
 }
 function codeDate(x) { return pastDate(x.code.slice(0, 4), fromIso(x.got || today())); }
-function problems(x) {
+// what needs doing now (puts the card on top of its column), then format slips (shown, not urgent)
+function problems(x) { return [...duty(x), ...slips(x)]; }
+function slips(x) {
+  if (x.keptOk || (x.sent && status(x) === "OK")) return [];      // history: left as it was
   const p = [];
-  if (!source(x.code)) p.push("编码格式不对（如 1019G-02）");
-  if (!x.desc.trim()) p.push("没有描述");
-  if (noteLines(x).some(l => !/^\d{4}/.test(l))) p.push("备注每行要以日期开头");
-  if (status(x) !== "OK") { const d = mmddToDate(planOf(x), DAY); if (!d || d <= DAY) p.push("最后一行末尾要写计划日期（晚于今天）"); }
+  if (!isF(x) && !source(x.code)) p.push("编码格式不对（如 1019G-02）");
+  if (!isF(x) && !x.desc.trim()) p.push("没有描述");
+  // a "见批注" line points at an Excel comment (shown on the card): not a slip
+  if (noteLines(x).some(l => !/^\d{4}/.test(l) && !l.includes("见批注"))) p.push("备注每行要以日期开头");
+  return p;
+}
+// F sheets say in their name which weekdays they are reviewed: F1立体模具缝周1周4 = Monday and Thursday
+function fDays(name) { return [...name.matchAll(/周([1-7])/g)].map(m => +m[1] % 7); }
+function lastDue(days) { const d = new Date(DAY); while (!days.includes(d.getDay())) d.setDate(d.getDate() - 1); return d; }
+function lastNoteDate(x) { const ls = noteLines(x).filter(l => /^\d{4}/.test(l)); return ls.length ? pastDate(ls[ls.length - 1].slice(0, 4), DAY) : null; }
+function duty(x) {
+  const p = [];
+  if (status(x) !== "OK") {
+    const days = isF(x) ? fDays(sheetOf(x)) : [];
+    if (days.length) {
+      const due = lastDue(days), last = lastNoteDate(x);
+      if (!last || last < due) p.push(mmdd(due) + " 该回顾更新" + (last ? "（上次 " + mmdd(last) + "）" : ""));
+      return p;
+    }
+    const d = planDate(x);
+    if (!d) p.push("最后一行末尾要写计划日期");
+    else if (d <= DAY) p.push(d < DAY ? "计划日期 " + planOf(x) + " 已过" : "计划今天到期");
+    if (noteLines(x).length && /^\d{4}$/.test(noteLines(x).slice(-1)[0])) p.push("今天还没写做了什么");
+    else if (!noteLines(x).length) p.push("还没有记录");
+  }
   return p;
 }
 // numbers for the journal's 组内日常清单表 line
 function todoCount(k) {
-  const it = TD().items;
+  const it = TD().items.filter(x => !isF(x));
   if (k === "tdIn") return it.filter(x => x.got === today()).length;
   if (k === "tdDone") return it.filter(x => x.xDate === today()).length;
   if (k === "tdOpen") return it.filter(x => status(x) !== "OK").length;
@@ -787,7 +1218,7 @@ function parseMessages(text) {
     if (codes.length) {
       const m = codes[0];
       cur = { code: m[1] + m[2].toUpperCase() + "-" + m[3].padStart(2, "0"),
-        desc: s.replace(m[0], "").replace(/^[\s:：,，、.。]+|[\s:：,，、]+$/g, "").replace(/[（(]\s*[）)]/g, "").replace(/\s{2,}/g, " ") };
+        desc: s.replace(m[0], "").replace(/^[\s:：,，、.。]+|[\s:：,，、]+$/g, "").replace(/[（(]\s*[）)]/g, "").replace(/\s{2,}/g, " ").replace(/([，,、；;])(\s*[，,、；;])+/g, "$1") };
       out.push(cur);
     } else if (cur) cur.desc += (cur.desc ? " " : "") + s;
     else out.push(cur = { code: "", desc: s });
@@ -796,75 +1227,194 @@ function parseMessages(text) {
 }
 
 // ---------- the to-do tab ----------
+// Kanban: one column per list (直接上级, 间接上级 · 大老板, each F sheet in use), side by side.
+// In each column: needs attention on top, then in progress, then closed today / not sent yet;
+// closed and already sent ones fold away at the bottom (only on request: there can be thousands).
 const todoEl = document.getElementById("todo");
-let showSent = false;
+let search = "", openFolds = {};
+const FOLD_STEP = 30;
+function columns() {
+  const td = TD(), keys = Object.keys(LISTS);
+  (td.fsheets || []).forEach(f => { if (td.items.some(x => sheetOf(x) === f.name)) keys.push(f.name); });
+  return keys;
+}
+function matches(x) {
+  if (!search) return true;
+  const q = search.toLowerCase();
+  return [x.code, x.desc, x.notes, (x.cats || []).join(" ")].some(t => (t || "").toLowerCase().includes(q));
+}
 function renderTodo() {
   const td = TD(); todoEl.innerHTML = "";
+  logOpen();
   const head = el("div", "todohead");
   const fn = el("span", "fname"); fn.contentEditable = "plaintext-only"; fn.textContent = td.fileBase; fn.dataset.ph = "日常清单-组-姓名";
   fn.title = "文件名（可以改）；后面的日期每天自动更新";
   fn.addEventListener("input", () => { td.fileBase = fn.textContent.replace(/[\\/:*?"<>|\n]/g, ""); clearTimeout(saveTimer); saveTimer = setTimeout(save, 300); });
   fn.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); fn.blur(); } });
   head.append("文件名 ", fn, el("span", "calc", "-" + fileDate() + ".xlsx"));
-  const counts = el("span", "legend"); counts.id = "todoCounts"; head.append(counts); showCounts();
-  const cb = el("label", "legend"); const c = el("input"); c.type = "checkbox"; c.checked = showSent;
-  c.addEventListener("change", () => { showSent = c.checked; renderTodo(); }); cb.append(c, " 显示已传的已收官记录"); head.append(cb);
-  todoEl.append(head);
 
+  // paste box: one line until you click into it
   const add = el("div", "addbox");
-  const ta = el("textarea"); ta.placeholder = "把上级带编码的消息粘贴到这里（可以一次贴几条），编码在哪个位置都可以，如 1019G-02";
+  const ta = el("textarea"); ta.rows = 1; ta.placeholder = "粘贴上级带编码的消息（可以几条），如 1019G-02 …";
+  ta.addEventListener("focus", () => { ta.rows = 5; });
+  ta.addEventListener("blur", () => { if (!ta.value.trim()) ta.rows = 1; });
   const b = el("button", "main", "加入清单");
   b.addEventListener("click", () => {
     const msgs = parseMessages(ta.value); let added = 0, dup = [];
     msgs.forEach(m => {
-      if (m.code && td.items.some(x => x.code === m.code)) { dup.push(m.code); return; }
+      // the same code from an earlier year is a different item: compare the dates too
+      const d = pastDate(m.code.slice(0, 4), DAY);
+      if (m.code && td.items.some(x => x.code.trim().toUpperCase() === m.code && +codeDate(x) === +d)) { dup.push(m.code); return; }
       td.items.push({ code: m.code, desc: m.desc, notes: T(), xDate: "", sent: 0, okSent: false, got: today() }); added++;
     });
     ta.value = ""; save(); renderTodo(); refresh();
     toast("加入 " + added + " 条" + (dup.length ? "；已在清单里：" + dup.join("，") : ""));
   });
-  add.append(ta, b); todoEl.append(add);
-
-  const list = td.items.filter(x => showSent || !x.sent)
-    .sort((a, b) => (codeDate(a) || 0) - (codeDate(b) || 0) || a.code.localeCompare(b.code));
-  list.forEach(x => todoEl.append(card(x)));
-  if (!list.length) todoEl.append(el("p", "legend", "清单是空的。"));
+  add.append(ta, b); head.append(add);
+  const find = el("input"); find.type = "search"; find.placeholder = "搜索（编码 / 描述 / 备注，也搜已收官）"; find.value = search; find.className = "find";
+  find.addEventListener("input", () => { search = find.value.trim(); renderCols(); });
+  const counts = el("span", "legend"); counts.id = "todoCounts";
+  head.append(find, counts); showCounts();
+  todoEl.append(head);
+  const cols = el("div", "todocols"); cols.id = "todoCols"; todoEl.append(cols);
+  renderCols();
+  if ((td.fsheets || []).length) loadImages();
+}
+function renderCols() {
+  const td = TD(), cols = document.getElementById("todoCols"); if (!cols) return;
+  cols.innerHTML = "";
+  const order = (a, b) => (a.ord ?? 1e9) - (b.ord ?? 1e9) || (codeDate(a) || 0) - (codeDate(b) || 0) || a.code.localeCompare(b.code);
+  columns().forEach(key => {
+    const items = td.items.filter(x => sheetOf(x) === key && matches(x)).sort(order);
+    const closed = x => status(x) === "OK";
+    const urgent = items.filter(x => !closed(x) && duty(x).length);
+    const going = items.filter(x => !closed(x) && !duty(x).length);
+    const done = items.filter(x => closed(x) && !x.sent);
+    const sent = items.filter(x => closed(x) && x.sent).reverse();   // newest first
+    const col = el("div", "todocol");
+    const h = el("h3", "", (LISTS[key] || key) + " ");
+    h.append(el("span", "legend", `未结 ${urgent.length + going.length}`));
+    col.append(h);
+    const part = (title, list, cls) => {
+      if (!list.length) return;
+      col.append(el("div", "part " + cls, title + "（" + list.length + "）"));
+      list.forEach(x => col.append(card(x)));
+    };
+    part("要处理：逾期 / 没记录", urgent, "hot");
+    part("进行中", going, "");
+    part("已收官，还没传", done, "");
+    if (!urgent.length && !going.length && !done.length) col.append(el("p", "legend", "没有未结的事项。"));
+    if (sent.length) {
+      // folded unless searching; opened: 30 at a time
+      const fold = el("details", "fold"); fold.open = !!search || !!openFolds[key];
+      fold.append(el("summary", "", "已收官、已传（" + sent.length + "）"));
+      const body = el("div");
+      const more = n => {
+        sent.slice(body.childElementCount, n).forEach(x => body.append(card(x)));
+        moreBtn.hidden = body.childElementCount >= sent.length;
+      };
+      const moreBtn = el("button", "more", "再显示 " + FOLD_STEP + " 条");
+      moreBtn.addEventListener("click", () => more(body.childElementCount + FOLD_STEP));
+      fold.addEventListener("toggle", () => { openFolds[key] = fold.open; if (fold.open && !body.childElementCount) more(FOLD_STEP); });
+      fold.append(body, moreBtn);
+      if (fold.open) more(FOLD_STEP);
+      col.append(fold);
+    }
+    cols.append(col);
+  });
 }
 function showCounts() {
   const c = document.getElementById("todoCounts");
-  if (c) c.textContent = `　未结 ${todoCount("tdOpen")} · 今天收到 ${todoCount("tdIn")} · 今天完成 ${todoCount("tdDone")} · 传递：${todoCount("tdSent")}`;
+  if (c) c.textContent = `未结 ${todoCount("tdOpen")} · 今天收到 ${todoCount("tdIn")} · 今天完成 ${todoCount("tdDone")} · 传递：${todoCount("tdSent")}`;
+}
+// open items per list per day, for the 未完成 rows of 02新增统计
+function logOpen() {
+  const td = TD(), log = td.openLog || (td.openLog = {});
+  const n = k => td.items.filter(x => sheetOf(x) === k && status(x) !== "OK").length;
+  log[today()] = { direct: n("direct"), indirect: n("indirect") };
+  Object.keys(log).sort().slice(0, -400).forEach(d => delete log[d]);
+}
+// pictures of the F sheets come from the stored Excel: read once per page load
+let IMAGES = null, imagesLoading = false;
+async function loadImages() {
+  if (IMAGES || imagesLoading) return;
+  imagesLoading = true;
+  try {
+    const B = book(await unzip((await templateBytes()).buffer)), out = {};
+    const MIME = { png: "image/png", jpeg: "image/jpeg", jpg: "image/jpeg", gif: "image/gif", bmp: "image/bmp", webp: "image/webp" };
+    const relsOf = f => partRels(B, f), resolve = partPath;
+    B.sheets.filter(sh => /^F\d/.test(sh.name)).forEach(sh => {
+      relsOf(sh.file).filter(r => /\/drawing$/.test(r.getAttribute("Type"))).forEach(r => {
+        const dfile = resolve(sh.file, r.getAttribute("Target")); if (!B.get(dfile)) return;
+        const media = {}; relsOf(dfile).forEach(m => { media[m.getAttribute("Id")] = resolve(dfile, m.getAttribute("Target")); });
+        const d = xml(B.text(dfile));
+        [...d.getElementsByTagNameNS("*", "twoCellAnchor"), ...d.getElementsByTagNameNS("*", "oneCellAnchor")].forEach(a => {
+          const from = a.getElementsByTagNameNS("*", "from")[0], blip = a.getElementsByTagNameNS("*", "blip")[0];
+          if (!from || !blip) return;
+          const row = +from.getElementsByTagNameNS("*", "row")[0].textContent + 1, f = B.get(media[blip.getAttributeNS(RNS, "embed")]);
+          const type = f && MIME[f.name.split(".").pop().toLowerCase()]; if (!type) return;
+          ((out[sh.name] ||= {})[row] ||= []).push(URL.createObjectURL(new Blob([f.data], { type })));
+        });
+      });
+    });
+    IMAGES = out; if (document.body.dataset.tab === "todo") renderCols();
+  } catch (e) { IMAGES = {}; }
+  imagesLoading = false;
 }
 function card(x) {
-  const td = TD(), box = el("div", "card");
+  const td = TD(), box = el("div", "card"), f = isF(x);
   const top = el("div", "cardtop");
   const code = el("span", "code"); code.contentEditable = "plaintext-only"; code.textContent = x.code; code.dataset.ph = "编码";
   const who = el("span", "chip");
-  const desc = el("span", "desc"); desc.contentEditable = "plaintext-only"; desc.textContent = x.desc; desc.dataset.ph = "描述";
+  const desc = el("div", "desc clamp"); desc.contentEditable = "plaintext-only"; desc.textContent = x.desc; desc.dataset.ph = "描述";
   const st = el("span", "chip st");
-  const del = ui("删除", () => { if (confirm("删除 " + x.code + "？")) { td.items.splice(td.items.indexOf(x), 1); save(); renderTodo(); refresh(); } });
-  top.append(code, who, desc, st, del);
-  const notes = el("textarea", "notes"); notes.value = x.notes; notes.rows = 1;
+  // rows that came from the Excel stay (they are its history); only items added here can be deleted
+  const del = x.srcRow ? "" : xBtn("删除", () => { if (confirm("删除 " + x.code + "？")) { td.items.splice(td.items.indexOf(x), 1); save(); renderTodo(); refresh(); } });
+  if (f) {
+    (x.cats || []).filter(Boolean).forEach(c => top.append(el("span", "chip", c)));
+    if (x.entered) top.append(el("span", "legend", mmdd(fromIso(x.entered)) + "入表"));
+    top.append(st);
+  } else { top.append(code, who, st); if (del) box.append(del); }
+  // the description gets the card's full width, 3 lines until you click into it
+  desc.addEventListener("focus", () => desc.classList.remove("clamp"));
+  desc.addEventListener("blur", () => desc.classList.add("clamp"));
+  box.append(top);
+  if (!f || x.desc.trim()) box.append(desc);     // F rows often have only a picture
+  const pics = f && IMAGES && (IMAGES[sheetOf(x)] || {})[x.srcRow];
+  if (pics) { const p = el("div", "pics"); pics.forEach(u => { const i = el("img"); i.src = u; i.addEventListener("click", () => window.open(u)); p.append(i); }); box.append(p); }
+  // only the last 4 record lines show; older ones behind 展开 (they stay in the item and the Excel)
+  const SHOW_LINES = 4;
+  const notes = el("textarea", "notes"); notes.rows = 1;
+  const older = el("span", "older"); let expanded = false, hidden = [];
   const btns = el("div", "cardbtns");
   const upd = el("button", "", "今日更新");
   const done = el("button", "", "收官 X");
   const prob = el("span", "prob");
   btns.append(upd, done, prob);
-  box.append(top, notes, btns);
+  if (x.comment) { const c = el("details", "cmt"); c.append(el("summary", "", "Excel 批注"), el("pre", "", x.comment)); box.append(c); }
+  box.append(older, notes, btns);
 
   const fit = () => { notes.style.height = "auto"; notes.style.height = notes.scrollHeight + 2 + "px"; };
+  const paint = () => {
+    const ls = x.notes.replace(/\s+$/, "").split("\n"), k = expanded ? 0 : Math.max(0, ls.length - SHOW_LINES);
+    hidden = ls.slice(0, k); notes.value = ls.slice(k).join("\n");
+    older.textContent = expanded ? "▲ 收起" : "▼ 展开更早的 " + hidden.length + " 条记录";
+    older.hidden = !expanded && !hidden.length; fit();
+  };
+  older.addEventListener("click", () => { expanded = !expanded; paint(); });
   const show = () => {
     const s = source(x.code), stat = status(x);
-    who.textContent = s ? s.name : "?";
+    who.textContent = s ? s.name : x.sent ? "" : "?"; who.hidden = !who.textContent;   // old code shapes in the history: no chip
     st.textContent = stat || "未结"; st.dataset.s = stat;
     const p = problems(x); prob.textContent = p.join("；");
-    box.classList.toggle("bad", p.length > 0); box.classList.toggle("ok", stat === "OK");
+    box.classList.toggle("bad", duty(x).length > 0); box.classList.toggle("ok", stat === "OK");
   };
-  const changedItem = () => { syncOk(x); show(); showCounts(); refresh(); clearTimeout(saveTimer); saveTimer = setTimeout(save, 300); };
+  const changedItem = () => { x.edited = true; syncOk(x); show(); showCounts(); refresh(); clearTimeout(saveTimer); saveTimer = setTimeout(save, 300); };
   code.addEventListener("input", () => { x.code = code.textContent.trim().toUpperCase(); changedItem(); });
   desc.addEventListener("input", () => { x.desc = desc.textContent; changedItem(); });
   [code, desc].forEach(e => e.addEventListener("keydown", ev => { if (ev.key === "Enter") { ev.preventDefault(); e.blur(); } }));
-  notes.addEventListener("input", () => { x.notes = notes.value; fit(); changedItem(); });
-  const appendLine = s => { x.notes = x.notes.replace(/\s+$/, "") + (x.notes.trim() ? "\n" : "") + s; notes.value = x.notes; fit(); changedItem(); };
+  notes.addEventListener("input", () => { x.notes = [...hidden, notes.value].join("\n"); x.keptOk = false; fit(); changedItem(); });
+  const appendLine = s => { x.notes = x.notes.replace(/\s+$/, "") + (x.notes.trim() ? "\n" : "") + s; x.keptOk = false; paint(); changedItem(); };
   upd.addEventListener("click", () => {
     const ls = noteLines(x);
     if (!(ls.length && ls[ls.length - 1] === T())) appendLine(T());
@@ -873,11 +1423,11 @@ function card(x) {
   done.addEventListener("click", () => {
     const ls = noteLines(x), last = ls[ls.length - 1] || "";
     if (/[Xx]$/.test(last)) return;
-    if (last.startsWith(T()) && last.length > 4) { x.notes = x.notes.replace(/\s+$/, "").replace(/\d{4}$/, "") + "。X"; notes.value = x.notes; fit(); changedItem(); }
+    if (last.startsWith(T()) && last.length > 4) { x.notes = x.notes.replace(/\s+$/, "").replace(/\d{4}$/, "") + "。X"; paint(); changedItem(); }
     else { if (last === T()) x.notes = x.notes.replace(/\s+$/, "").slice(0, -4).replace(/\s+$/, ""); appendLine(T() + "已处理。X"); }
     const i = notes.value.lastIndexOf("已处理"); if (i >= 0) { notes.focus(); notes.setSelectionRange(i, i + 3); }
   });
-  show(); setTimeout(fit);
+  show(); paint(); setTimeout(fit);
   return box;
 }
 
@@ -987,7 +1537,55 @@ function setFilterName(B, sheet, ref) {
 }
 const AFTER_FILTER = ["sortState", "dataConsolidate", "customSheetViews", "mergeCells", "phoneticPr", "conditionalFormatting", "dataValidations", "hyperlinks", "printOptions", "pageMargins", "pageSetup", "headerFooter", "drawing", "legacyDrawing", "tableParts", "extLst"];
 
-// one 01日常清单 sheet: header row kept, every item one row, sent ones hidden by the 先前已传 filter
+// An imported Excel is changed in place: its rows stay where they are (so comments, pictures and
+// hidden rows stay right), only rows edited here are rewritten, new items go at the bottom.
+function rowMap(sd) { return new Map([...sd.getElementsByTagName("row")].map(r => [+r.getAttribute("r"), r])); }
+function setCell(d, row, ref, kind, val) {
+  const old = [...row.getElementsByTagName("c")].find(c => c.getAttribute("r") === ref);
+  const c = cell(d, ref, old ? old.getAttribute("s") : null, kind, val);
+  if (old) { row.replaceChild(c, old); return; }
+  const after = [...row.getElementsByTagName("c")].find(e => colNum(e.getAttribute("r")) > colNum(ref));
+  row.insertBefore(c, after || null);
+}
+function newRow(d, sd, r, sample) {
+  const row = d.createElementNS(NS, "row"); row.setAttribute("r", r);
+  if (sample && sample.getAttribute("s")) { row.setAttribute("s", sample.getAttribute("s")); row.setAttribute("customFormat", "1"); }
+  // the new row's cells get the styles of the sample row's cells
+  if (sample) [...sample.getElementsByTagName("c")].forEach(c => { const e = d.createElementNS(NS, "c"); e.setAttribute("r", colName(colNum(c.getAttribute("r"))) + r); if (c.getAttribute("s")) e.setAttribute("s", c.getAttribute("s")); row.append(e); });
+  sd.append(row); return row;
+}
+function growRefs(B, sheet, d, last) {
+  const end = ref => +(ref.match(/\d+$/) || [0])[0];
+  const dim = d.getElementsByTagName("dimension")[0];
+  if (dim && last > end(dim.getAttribute("ref"))) dim.setAttribute("ref", dim.getAttribute("ref").replace(/\d+$/, last));
+  const af = d.getElementsByTagName("autoFilter")[0];
+  if (af && last > end(af.getAttribute("ref"))) { const ref = af.getAttribute("ref").replace(/\d+$/, last); af.setAttribute("ref", ref); setFilterName(B, sheet, ref); }
+}
+// cols: column number of each field; items: this sheet's items in order
+function fillInPlace(B, sheet, items, cols) {
+  const d = xml(B.text(sheet.file)), sd = d.getElementsByTagName("sheetData")[0], rows = rowMap(sd), w = colWidths(d);
+  let last = Math.max(1, ...rows.keys()), changed = false, appended = 0;
+  const sample = rows.get(last) || rows.get(1);
+  items.forEach(x => {
+    let row = x.srcRow && rows.get(x.srcRow);
+    if (row && !x.edited) return;
+    changed = true;
+    if (!row) { row = newRow(d, sd, ++last, sample); appended = last; }
+    const r = row.getAttribute("r"), put = (k, kind, v) => { if (cols[k]) setCell(d, row, colName(cols[k]) + r, kind, v); };
+    put("code", "str", x.code); put("desc", "str", x.desc); put("st", "str", status(x));
+    put("xd", "num", x.xDate ? serial(x.xDate) : ""); put("sent", "num", x.sent ? 1 : ""); put("notes", "str", x.notes.trim());
+    const h = Math.max(textLines(x.desc, w[cols.desc] || 58), textLines(x.notes, w[cols.notes] || 37));
+    row.setAttribute("ht", (Math.max(h, 1) * 13.9).toFixed(2)); row.setAttribute("customHeight", "1");
+    if (x.sent) row.setAttribute("hidden", "1"); else row.removeAttribute("hidden");
+  });
+  if (!changed) return;      // untouched sheets go out exactly as they came
+  growRefs(B, sheet, d, appended);
+  B.put(sheet.file, xmlText(d));
+}
+const LIST_COLS = { code: 1, desc: 2, st: 3, xd: 4, sent: 5, notes: 6 };
+
+// one 01日常清单 sheet built from scratch (a list that never came from an imported Excel):
+// header row kept, every item one row, sent ones hidden by the 先前已传 filter
 function fillList(B, sheet, items, base) {
   const d = xml(base), sd = d.getElementsByTagName("sheetData")[0];
   const rows = [...sd.getElementsByTagName("row")];
@@ -1024,7 +1622,107 @@ function fillList(B, sheet, items, base) {
   B.put(sheet.file, xmlText(d));
 }
 
-// 02新增统计: 8 rows per month (A/B x 单独/大群/小群 + 汇总), one column per day, sums as formulas
+// 02新增统计: blocks of rows per month (A/B x 单独/大群/小群, 汇总, maybe 未完成), one column per day (E = day 1).
+// Changed in place: each person's own rows stay (deleted rows stay deleted, extra 未完成 rows are kept
+// and filled from the open items), only counts of items added here are written, a new month copies
+// the rows of the month before.
+const DAY_COL = day => 4 + day, SUM_COL = 36;
+function cellVal(B, c) {
+  if (!c) return "";
+  const t = c.getAttribute("t"), v = c.getElementsByTagName("v")[0], is = c.getElementsByTagName("is")[0];
+  return t === "s" ? B.ss[+v.textContent] : t === "inlineStr" ? (is ? tText(is) : "") : v ? v.textContent : "";
+}
+function rowCells(row) { const m = {}; [...row.getElementsByTagName("c")].forEach(c => { m[colNum(c.getAttribute("r"))] = c; }); return m; }
+function statKind(label) {
+  const l = label.trim();
+  if (l.includes("未完成")) return { open: l.includes("直接") ? "direct" : "indirect" };
+  if (l.includes("汇总")) return { sum: l[0] };
+  const s = STAT_ROWS.find(x => x[1] === l); return s ? { key: s[0] } : {};
+}
+function fillStats(B, sheet) {
+  const td = TD(), d = xml(B.text(sheet.file)), sd = d.getElementsByTagName("sheetData")[0];
+  const header = [...sd.getElementsByTagName("row")].find(r => r.getAttribute("r") === "1");
+  // counts of the items added here (an imported item is already counted in the file)
+  const counted = {};
+  td.items.forEach(x => {
+    if (x.imported) return;
+    const s = source(x.code), dt = codeDate(x); if (!s || !dt) return;
+    const k = monthCode(dt) + "|" + s.row; (counted[k] ||= {})[dt.getDate()] = (counted[k][dt.getDate()] || 0) + 1;
+  });
+  const blocks = () => {
+    const out = new Map();
+    [...sd.getElementsByTagName("row")].forEach(row => {
+      if (row === header) return;
+      const c = rowCells(row), mc = String(cellVal(B, c[2])).trim();
+      if (/^\d{5}$/.test(mc)) (out.get(mc) || out.set(mc, []).get(mc)).push({ row, label: String(cellVal(B, c[4])) });
+    });
+    return out;
+  };
+  let bl = blocks(), last = Math.max(1, ...rowMap(sd).keys());
+  const monthOf = mc => new Date(2000 + +mc.slice(1, 3), +mc.slice(3) - 1, 1);
+  const have = [...bl.keys()].sort(), want = Object.keys(counted).map(k => k.split("|")[0]).sort();
+  let m = have.length ? monthOf(have[have.length - 1]) : monthOf(want[0] || monthCode(DAY));
+  if (have.length) m = new Date(m.getFullYear(), m.getMonth() + 1, 1);
+  // new months: copy the newest month's rows (or the standard 8 rows), values cleared, sums rewritten
+  for (; m <= DAY; m = new Date(m.getFullYear(), m.getMonth() + 1, 1)) {
+    const prev = have.length ? bl.get([...bl.keys()].sort().pop()) : STAT_ROWS.map(s => ({ row: header, label: s[1], fresh: true }));
+    const first = last + 1;
+    prev.forEach(p => {
+      const r = ++last, row = d.createElementNS(NS, "row"), src = rowCells(p.row), kind = statKind(p.label);
+      row.setAttribute("r", r);
+      ["s", "customFormat", "ht", "customHeight"].forEach(a => { if (!p.fresh && p.row.getAttribute(a)) row.setAttribute(a, p.row.getAttribute(a)); });
+      const st = k => src[k] && src[k].getAttribute("s");
+      const c3 = p.fresh ? 1 : cellVal(B, src[3]);
+      row.append(cell(d, "A" + r, st(1), "num", bizYear(m)), cell(d, "B" + r, st(2), "num", monthCode(m)));
+      row.append(cell(d, "C" + r, st(3), "num", kind.sum ? "" : c3));   // 汇总 rows get their sums below
+      row.append(cell(d, "D" + r, st(4), "str", p.label));
+      for (let day = 1; day <= 31; day++) row.append(cell(d, colName(DAY_COL(day)) + r, st(DAY_COL(day)), "num", ""));
+      const hadSum = p.fresh ? !kind.open : src[SUM_COL] && src[SUM_COL].getElementsByTagName("f").length;
+      if (hadSum) row.append(cell(d, "AJ" + r, st(SUM_COL), "f", `SUM(E${r}:AI${r})`));
+      // anything right of AJ (notes like 若无适合此行…) is copied as it was
+      Object.keys(src).map(Number).filter(k => k > SUM_COL).sort((a, b) => a - b).forEach(k => {
+        const e = src[k].cloneNode(true); e.setAttribute("r", colName(k) + r); e.getElementsByTagName("f").length || row.append(e);
+      });
+      sd.append(row);
+    });
+    // 汇总 rows: sum of the rows of the same letter just above them
+    for (let r = first; r <= last; r++) {
+      const row = rowMap(sd).get(r), label = String(cellVal(B, rowCells(row)[4])), kind = statKind(label);
+      if (!kind.sum) continue;
+      let top = r;
+      while (top - 1 >= first) {
+        const l = String(cellVal(B, rowCells(rowMap(sd).get(top - 1))[4])).trim();
+        if (l[0] !== kind.sum || l.includes("汇总") || l.includes("未完成")) break;
+        top--;
+      }
+      if (top === r) continue;
+      [3, ...Array.from({ length: 31 }, (_, i) => DAY_COL(i + 1)), SUM_COL].forEach(k => setCell(d, row, colName(k) + r, "f", `SUM(${colName(k)}${top}:${colName(k)}${r - 1})`));
+    }
+    bl = blocks(); have.push(monthCode(m));
+  }
+  // write the numbers
+  const fillFrom = td.importDay ? fromIso(td.importDay) : null;
+  bl.forEach((rows, mc) => {
+    const mo = monthOf(mc), days = new Date(mo.getFullYear(), mo.getMonth() + 1, 0).getDate();
+    rows.forEach(({ row, label }) => {
+      const kind = statKind(label), c = rowCells(row), r = row.getAttribute("r");
+      if (!kind.key && !kind.open) return;
+      for (let day = 1; day <= days; day++) {
+        const date = new Date(mo.getFullYear(), mo.getMonth(), day); if (date > DAY) break;
+        const ref = colName(DAY_COL(day)) + r, cur = c[DAY_COL(day)], v = cellVal(B, cur);
+        if (cur && cur.getElementsByTagName("f").length) continue;
+        if (kind.open) { const n = (td.openLog || {})[iso(date)]; if (v === "" && n) setCell(d, row, ref, "num", n[kind.open]); continue; }
+        const n = (counted[mc + "|" + kind.key] || {})[day];
+        if (n && n > (+v || 0)) setCell(d, row, ref, "num", n);
+        else if (v === "" && WORKDAYS.includes(date.getDay()) && (!fillFrom || date >= fillFrom)) setCell(d, row, ref, "num", 0);
+      }
+    });
+  });
+  const dim = d.getElementsByTagName("dimension")[0]; if (dim) dim.setAttribute("ref", dim.getAttribute("ref").replace(/\d+$/, last));
+  B.put(sheet.file, xmlText(d));
+}
+
+// 02新增统计 for a list that never came from an imported Excel (built-in file): rebuilt, 8 rows per month (A/B x 单独/大群/小群 + 汇总), one column per day, sums as formulas
 function statValues() {
   const out = {}, td = TD();
   Object.entries(td.statsBase || {}).forEach(([k, days]) => { out[k] = { ...days }; });
@@ -1036,7 +1734,7 @@ function statValues() {
   Object.entries(counted).forEach(([k, days]) => { out[k] ||= {}; Object.entries(days).forEach(([day, n]) => { out[k][day] = Math.max(out[k][day] || 0, n); }); });
   return out;
 }
-function fillStats(B, sheet) {
+function fillStatsRebuild(B, sheet) {
   const d = xml(B.text(sheet.file)), sd = d.getElementsByTagName("sheetData")[0];
   const rows = [...sd.getElementsByTagName("row")];
   const header = rows.find(r => r.getAttribute("r") === "1");
@@ -1073,28 +1771,65 @@ function fillStats(B, sheet) {
   B.put(sheet.file, xmlText(d));
 }
 
+// ---------- the stored Excel (the imported file is the template of every download) ----------
+// Kept in the browser's database (IndexedDB, room for big files), not in localStorage (about 5 MB).
 function b64(u8) { let s = ""; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode(...u8.subarray(i, i + 0x8000)); return btoa(s); }
 function unb64(s) { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }
-function templateBytes() { try { const t = localStorage.getItem(TEMPLATE_KEY); if (t) return unb64(t); } catch (e) {} return unb64(DEFAULT_XLSX); }
+function idb(mode, fn) {
+  return new Promise((ok, no) => {
+    const open = indexedDB.open("journal", 1);
+    open.onupgradeneeded = () => open.result.createObjectStore("files");
+    open.onerror = () => no(open.error);
+    open.onsuccess = () => {
+      const t = open.result.transaction("files", mode), q = fn(t.objectStore("files"));
+      t.oncomplete = () => ok(q && q.result); t.onerror = t.onabort = () => no(t.error);
+    };
+  });
+}
+// the imported file; null when an imported list has lost its file (then nothing may be downloaded)
+async function templateBytes() {
+  const id = TD().templateId;
+  if (id) { try { const v = await idb("readonly", s => s.get(id)); if (v) return new Uint8Array(v); } catch (e) {} return null; }
+  try { const t = localStorage.getItem(TEMPLATE_KEY); if (t) return unb64(t); } catch (e) {}
+  return unb64(DEFAULT_XLSX);
+}
+async function storeTemplate(u8) {
+  const id = "xlsx-" + Date.now();
+  await idb("readwrite", s => { s.clear(); return s.put(u8, id); });
+  try { localStorage.removeItem(TEMPLATE_KEY); } catch (e) {}
+  return id;
+}
 
 async function buildXlsx() {
   const td = TD();
   // 须知 6: an item that was OK and already sent once gets 先前已传 = 1
-  td.items.forEach(x => { if (status(x) === "OK" && x.okSent) x.sent = 1; });
-  const B = book(await unzip(templateBytes().buffer));
-  const byCode = (a, b) => (codeDate(a) || 0) - (codeDate(b) || 0) || a.code.localeCompare(b.code);
-  const direct = td.items.filter(x => sheetOf(x) === "direct").sort(byCode);
-  const indirect = td.items.filter(x => sheetOf(x) === "indirect").sort(byCode);
-  if (B.direct) fillList(B, B.direct, direct, B.text(B.direct.file));
-  if (B.indirect && indirect.length) {
-    // the 间接上级 sheet may be empty in the file: then it gets the 直接上级 sheet's columns and header
-    const own = B.text(B.indirect.file);
-    const base = /<row /.test(own) ? own : B.text(B.direct.file)
-      .replace(/ xr:uid="\{[^}]*\}"/g, "").replace(/<pageSetup([^>]*?) r:id="[^"]*"/, "<pageSetup$1").replace(/<(legacyDrawing|drawing)[^>]*\/>/g, "")
-      .replace(/<tabColor[^>]*\/>/, "");
-    fillList(B, B.indirect, indirect, base);
+  td.items.forEach(x => { if (status(x) === "OK" && x.okSent && !x.sent) { x.sent = 1; x.edited = true; } });
+  const bytes = await templateBytes();
+  if (!bytes) throw new Error("找不到导入时存下的Excel，请再导入一次你最新的Excel");
+  const B = book(await unzip(bytes.buffer));
+  const order = (a, b) => (a.ord ?? 1e9) - (b.ord ?? 1e9) || (codeDate(a) || 0) - (codeDate(b) || 0) || a.code.localeCompare(b.code);
+  const direct = td.items.filter(x => sheetOf(x) === "direct").sort(order);
+  const indirect = td.items.filter(x => sheetOf(x) === "indirect").sort(order);
+  if (B.direct) {
+    if (direct.some(x => x.srcRow)) fillInPlace(B, B.direct, direct, LIST_COLS);
+    else fillList(B, B.direct, direct, B.text(B.direct.file));
   }
-  if (B.stats) fillStats(B, B.stats);
+  if (B.indirect && indirect.length) {
+    if (indirect.some(x => x.srcRow)) fillInPlace(B, B.indirect, indirect, LIST_COLS);
+    else {
+      // the 间接上级 sheet may be empty in the file: then it gets the 直接上级 sheet's columns and header
+      const own = B.text(B.indirect.file);
+      const base = /<row /.test(own) ? own : B.text(B.direct.file)
+        .replace(/ xr:uid="\{[^}]*\}"/g, "").replace(/<pageSetup([^>]*?) r:id="[^"]*"/, "<pageSetup$1").replace(/<(legacyDrawing|drawing)[^>]*\/>/g, "")
+        .replace(/<tabColor[^>]*\/>/, "");
+      fillList(B, B.indirect, indirect, base);
+    }
+  }
+  (td.fsheets || []).forEach(f => {
+    const sh = B.sheets.find(s => s.name === f.name);
+    if (sh) fillInPlace(B, sh, td.items.filter(x => sheetOf(x) === f.name).sort(order), f.cols);
+  });
+  if (B.stats) { if (td.templateId) fillStats(B, B.stats); else fillStatsRebuild(B, B.stats); }
   // formulas changed: Excel recalculates on opening; the old calculation chain is dropped
   const calc = B.wb.getElementsByTagName("calcPr")[0]; if (calc) calc.setAttribute("fullCalcOnLoad", "1");
   B.put("xl/workbook.xml", xmlText(B.wb));
@@ -1107,6 +1842,7 @@ async function buildXlsx() {
 async function downloadXlsx() {
   const td = TD();
   if (!td.fileBase.trim()) { toast("先在上面填写文件名"); return; }
+  logOpen();
   const blob = await buildXlsx();
   const now = new Date(), name = fileName();
   const a = el("a"); a.href = URL.createObjectURL(blob); a.download = name; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
@@ -1117,31 +1853,46 @@ async function downloadXlsx() {
   toast("已下载 " + name);
 }
 
-// reading the current Excel once: items from both 01 sheets, 02 numbers kept, the file becomes the template
+// reading the current Excel once: items from both 01 sheets and the F sheets, each remembering its row;
+// the file becomes the template. 状态 OK in the file = closed, with or without the X.
 async function importXlsx(file) {
   const buf = await file.arrayBuffer(), B = book(await unzip(buf.slice(0)));
   if (!B.direct) throw new Error("找不到“01日常清单-直接上级”子表");
-  const items = [];
+  const items = [], fsheets = [];
+  const isOk = v => String(v || "").normalize("NFKC").trim().toUpperCase() === "OK";
+  const finish = (x, st) => {
+    if (isOk(st) && status(x) !== "OK") x.keptOk = true;
+    if (!x.got) { const d = pastDate(x.code.slice(0, 4), x.xDate ? fromIso(x.xDate) : DAY); x.got = d ? iso(d) : today(); }
+    items.push(x);
+  };
   [B.direct, B.indirect].forEach(sh => {
     if (!sh) return;
-    const sheet = sh === B.direct ? "direct" : "indirect";
-    readRows(B, sh).filter(r => r.r > 1).forEach(({ cells: c }) => {
-      const code = String(c[1] || "").trim().toUpperCase(); if (!code && !c[2]) return;
-      const x = { code, desc: String(c[2] || ""), notes: String(c[6] || "").replace(/\r/g, ""), xDate: serialToIso(c[4]),
-        sent: String(c[5] || "").trim() === "1" ? 1 : 0, okSent: false, got: "", sheet };
-      const d = pastDate(code.slice(0, 4), x.xDate ? fromIso(x.xDate) : DAY);
-      x.got = d ? iso(d) : today();
-      if (status(x) === "OK" && !x.xDate) x.xDate = x.got;
-      items.push(x);
+    const sheet = sh === B.direct ? "direct" : "indirect", notes = sheetComments(B, sh);
+    readRows(B, sh).filter(r => r.r > 1).forEach(({ r, cells: c }) => {
+      const code = String(c[1] || "").trim(); if (!code && !c[2] && !c[6]) return;
+      finish({ code, desc: String(c[2] || ""), notes: String(c[6] || "").replace(/\r/g, ""), xDate: serialToIso(c[4]),
+        sent: String(c[5] || "").trim() === "1" ? 1 : 0, okSent: false, got: "", sheet, srcRow: r, ord: items.length, imported: true, comment: notes[r] || "" }, c[3]);
     });
   });
-  const base = {};
-  if (B.stats) readRows(B, B.stats).filter(r => r.r > 1).forEach(({ cells: c }) => {
-    const month = String(c[2] || ""), key = (STAT_ROWS.find(s => s[1] === String(c[4] || "").trim()) || [])[0];
-    if (!/^\d{5}$/.test(month) || !key || key.length < 2) return;
-    for (let day = 1; day <= 31; day++) { const v = c[4 + day]; if (v !== undefined && v !== "" && !isNaN(+v)) (base[month + "|" + key] ||= {})[day] = +v; }
+  // F1, F2 … tracking sheets: columns found by their titles
+  B.sheets.filter(sh => /^F\d/.test(sh.name)).forEach(sh => {
+    const rows = readRows(B, sh), head = rows.find(r => r.r === 1); if (!head) return;
+    const titles = Object.entries(head.cells).map(([k, v]) => [+k, String(v || "").trim()]);
+    const col = t => (titles.find(([, v]) => v === t) || titles.find(([, v]) => v.startsWith(t)) || [0])[0];
+    const cols = { desc: col("事项描述"), st: col("状态"), xd: col("打X登记日期"), sent: col("先前已传"), notes: col("进展备注"), entered: col("入表日期"),
+      cats: titles.filter(([, v]) => /^分类\d/.test(v)).sort((a, b) => a[1].localeCompare(b[1])).map(([k]) => k) };
+    if (!cols.desc || !cols.notes) return;
+    fsheets.push({ name: sh.name, cols });
+    const notes = sheetComments(B, sh);
+    rows.filter(r => r.r > 1).forEach(({ r, cells: c }) => {
+      if (!c[cols.desc] && !c[cols.notes]) return;
+      const entered = serialToIso(c[cols.entered]);
+      finish({ code: "", desc: String(c[cols.desc] || ""), notes: String(c[cols.notes] || "").replace(/\r/g, ""), xDate: serialToIso(c[cols.xd]),
+        sent: String(c[cols.sent] || "").trim() === "1" ? 1 : 0, okSent: false, got: entered || today(), entered, sheet: sh.name,
+        cats: cols.cats.map(k => String(c[k] || "").trim()), srcRow: r, ord: items.length, imported: true, comment: notes[r] || "" }, c[cols.st]);
+    });
   });
-  return { items, base, bytes: new Uint8Array(buf) };
+  return { items, fsheets, bytes: new Uint8Array(buf) };
 }
 
 // ---------- tabs and buttons ----------
@@ -1157,11 +1908,14 @@ document.getElementById("xlsxIn").addEventListener("change", async e => {
   const f = e.target.files[0]; e.target.value = ""; if (!f) return;
   try {
     const r = await importXlsx(f), td = TD();
-    if (!confirm(`读到 ${r.items.length} 条记录。用这个文件替换现在的日常清单？（这个文件也会成为以后下载的样子）`)) return;
-    td.items = r.items; td.statsBase = r.base;
+    const open = r.items.filter(x => status(x) !== "OK").length;
+    if (!confirm(`读到 ${r.items.length} 条记录（未结 ${open} 条）。用这个文件替换现在的日常清单？（这个文件也会成为以后下载的样子）`)) return;
+    let id;
+    try { id = await storeTemplate(r.bytes); } catch (err) { toast("浏览器存不下这个文件，没有导入：" + err.message); return; }
+    td.items = r.items; td.fsheets = r.fsheets; td.templateId = id; td.importDay = today(); delete td.statsBase;
     // the imported file's name without its date part becomes the file name
     const m = f.name.replace(/\.xlsx$/i, "").match(/^(.*?)-\d{6,8}(-\d+)?$/); if (m) td.fileBase = m[1];
-    try { localStorage.setItem(TEMPLATE_KEY, b64(r.bytes)); } catch (err) { toast("文件太大，没有存成样板；下载会用默认样子"); }
+    IMAGES = null; openFolds = {};
     save(); renderTodo(); refresh(); toast("已导入 " + r.items.length + " 条");
   } catch (err) { toast("读不了这个文件：" + err.message); }
 });
