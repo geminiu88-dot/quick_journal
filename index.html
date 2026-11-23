@@ -1622,6 +1622,32 @@ function fillList(B, sheet, items, base) {
   B.put(sheet.file, xmlText(d));
 }
 
+// 02新增统计: the filter on 月份 (column B) shows only this month and last month, older months' rows hidden
+function filterRecentMonths(B, sheet, d, sd, lastRow) {
+  const keep = [monthCode(new Date(DAY.getFullYear(), DAY.getMonth() - 1, 1)), monthCode(DAY)].map(String), ws = d.documentElement;
+  [...sd.getElementsByTagName("row")].forEach(row => {
+    const r = +row.getAttribute("r"); if (r === 1) return;
+    if (keep.includes(String(cellVal(B, rowCells(row)[2])).trim())) row.removeAttribute("hidden"); else row.setAttribute("hidden", "1");
+  });
+  let af = d.getElementsByTagName("autoFilter")[0];
+  if (!af) {
+    af = d.createElementNS(NS, "autoFilter");
+    const before = [...ws.children].find(c => AFTER_FILTER.includes(c.localName));
+    ws.insertBefore(af, before || null);
+  }
+  const ref = "A1:" + ((af.getAttribute("ref") || "").match(/:([A-Z]+)/) || [, "AJ"])[1] + lastRow;
+  af.setAttribute("ref", ref);
+  [...af.getElementsByTagName("filterColumn")].forEach(f => af.removeChild(f));
+  const fc = d.createElementNS(NS, "filterColumn"), fl = d.createElementNS(NS, "filters");
+  fc.setAttribute("colId", "1");
+  keep.forEach(v => { const f = d.createElementNS(NS, "filter"); f.setAttribute("val", v); fl.append(f); });
+  fc.append(fl); af.append(fc);
+  let pr = d.getElementsByTagName("sheetPr")[0];
+  if (!pr) { pr = d.createElementNS(NS, "sheetPr"); ws.insertBefore(pr, ws.firstElementChild); }
+  pr.setAttribute("filterMode", "1");
+  setFilterName(B, sheet, ref);
+}
+
 // 02新增统计: blocks of rows per month (A/B x 单独/大群/小群, 汇总, maybe 未完成), one column per day (E = day 1).
 // Changed in place: each person's own rows stay (deleted rows stay deleted, extra 未完成 rows are kept
 // and filled from the open items), only counts of items added here are written, a new month copies
@@ -1719,6 +1745,7 @@ function fillStats(B, sheet) {
     });
   });
   const dim = d.getElementsByTagName("dimension")[0]; if (dim) dim.setAttribute("ref", dim.getAttribute("ref").replace(/\d+$/, last));
+  filterRecentMonths(B, sheet, d, sd, last);
   B.put(sheet.file, xmlText(d));
 }
 
@@ -1768,6 +1795,7 @@ function fillStatsRebuild(B, sheet) {
     m = new Date(m.getFullYear(), m.getMonth() + 1, 1);
   }
   const dim = d.getElementsByTagName("dimension")[0]; if (dim) dim.setAttribute("ref", "A1:BF" + (r - 1));
+  filterRecentMonths(B, sheet, d, sd, r - 1);
   B.put(sheet.file, xmlText(d));
 }
 
