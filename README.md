@@ -63,15 +63,14 @@ exact format on the right, made from the form. 「复制日志」 copies that te
   rows per month). The built-in template
   (`DEFAULT_XLSX`) is the group's file with the example rows, the 须知 pictures
   and author names removed. No library: the browser unzips/zips the file.
-- **Client numbers from the old system:** the C1有单老客 section has a
-  bookmark link 「复制客户数量」 (drag it to the bookmarks bar) and a button
-  「粘贴系统数量」. The bookmark runs on the old system's 客户总表 page, reads the
-  client table (columns found by title) and copies, per client 简称 and product
-  line (沙滩鞋, 室内鞋): last year's orders (去年定单数量), this year's
-  (已接定单数量), 未出 = ordered but not shipped (已投产未出数 + 已接未投产数) and 估
-  (预估未下单数). The button fills the clients already in the journal whose 简称
-  matches; a product line with no order in either year is left out; changed
-  boxes get a blue frame with the old value as a tooltip. It goes through the
-  clipboard because the two pages are different sites. The bookmark holds no
-  data and changes nothing on the old system.
+- **Client numbers from the old system:** 「粘贴系统数量」 in the C1有单老客
+  section. On the old system's 客户总表 page, click the ERP bookmark 复制本页
+  (smol_system `tools/erp_bookmarks/`: copies the page's boxes and tables to
+  the clipboard), then press the button here. It finds the client table by
+  its column titles and fills, per client 简称 and product line (沙滩鞋,
+  室内鞋): last year's orders (去年定单数量), this year's (已接定单数量), 未出 =
+  ordered but not shipped (已投产未出数 + 已接未投产数) and 估 (预估未下单数).
+  Only clients already in the journal are filled; a product line with no
+  order in either year is left out; changed boxes get a blue frame with the
+  old value as a tooltip. Nothing about the old system is stored in this page.
 - Not done yet: business-year rollover on 31 Oct (rule 10), other teams' formats.

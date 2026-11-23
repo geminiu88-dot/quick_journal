@@ -168,7 +168,6 @@
   .qlabel { font-size: 13px; font-weight: bold; }
   .num input.chg { outline: 2px solid var(--ui); }
   .sysrow { margin: 2px 0 8px; } .sysrow .hint { display: inline; margin: 0; }
-  a.bm { font-size: 13px; padding: 1px 10px; border: 1px dashed var(--ui); border-radius: 12px; color: var(--ui); text-decoration: none; cursor: grab; white-space: nowrap; }
   @media print { .bar, .ui, .add, details { display: none !important; } [contenteditable], .calc, select { background: none; border: 0; } }
 </style>
 </head>
@@ -692,81 +691,44 @@ function itemList(sec, list, withCat) {
 
 
 // ---------- client numbers from the old system (客户总表) ----------
-// Bookmark 「复制客户数量」: run on the old system's 客户总表 page, it reads the client table and
-// copies each client's pairs per product line (沙滩鞋, 室内鞋...) as text; 「粘贴系统数量」 in the
-// C1有单老客 section fills them in. The clipboard is the way across: the old system and this
-// page are different sites. Columns are found by their titles, never by position. It changes
-// nothing on the old system's page. Kept as a function here so the bookmark link is made from
-// this code (comments only on lines of their own, like every bookmark).
-function erpClientsBookmark() {
-  var tables = document.querySelectorAll("table"), grid = null, heads = [];
-  for (var t = 0; t < tables.length && !grid; t++) {
-    var row = tables[t].rows[0];
-    if (!row) continue;
-    var hs = [];
-    for (var c = 0; c < row.cells.length; c++) hs.push(row.cells[c].textContent.replace(/\s+/g, ""));
-    if (hs.indexOf("客户简称") >= 0 && hs.indexOf("已接定单数量") >= 0 && hs.indexOf("年度") >= 0) { grid = tables[t]; heads = hs; }
-  }
-  var say = function (html, ok) {
-    var old = document.getElementById("journal-clients-box");
-    if (old) old.remove();
-    var box = document.createElement("div");
-    box.id = "journal-clients-box";
-    box.style.cssText = "position:fixed;top:8px;right:8px;z-index:99999;background:#fff;color:#000;border:2px solid " + (ok ? "#2b8a3e" : "#d2433a") + ";padding:8px 12px;font:14px sans-serif;box-shadow:0 2px 8px #0004;max-width:420px";
-    box.innerHTML = html + "<div style='text-align:right'><a href='#' id='journal-clients-x'>关闭</a></div>";
-    document.body.appendChild(box);
-    document.getElementById("journal-clients-x").onclick = function () { box.remove(); return false; };
-    return box;
-  };
-  if (!grid) { say("没找到客户表。请在旧系统的 <b>客户总表</b> 页面点这个书签。", false); return; }
-  var col = function (title, from) { return heads.indexOf(title, from || 0); };
-  var num = function (cells, i) {
-    if (i < 0 || !cells[i]) return 0;
-    var v = parseInt(cells[i].textContent.replace(/[,\s]/g, ""), 10);
-    return isNaN(v) ? 0 : v;
-  };
-  // product lines: every column group titled <产品>已接定单数量
-  var products = [];
-  for (var h = 0; h < heads.length; h++) {
-    var m = heads[h].match(/^(.+)已接定单数量$/);
-    if (!m) continue;
-    var first = col(m[1] + "低估定单数量");
-    if (first < 0) first = h - 10;
-    products.push({ name: m[1], ordered: h, last: col("去年定单数量", first), made: col(m[1] + "已投产未出数"),
-      waiting: col(m[1] + "已接未投产数"), est: col(m[1] + "预估未下单数") });
-  }
-  var nameCol = col("客户简称"), yearCol = col("年度"), clients = [], year = 0;
-  for (var r = 1; r < grid.rows.length; r++) {
-    var cells = grid.rows[r].cells;
-    if (cells.length < heads.length) continue;
-    var name = cells[nameCol].textContent.replace(/\s+/g, "").toUpperCase();
-    if (!name) continue;
-    year = year || num(cells, yearCol);
-    var lines = [];
-    for (var p = 0; p < products.length; p++) {
-      var P = products[p];
-      lines.push({ product: P.name, last: num(cells, P.last), ordered: num(cells, P.ordered),
-        unshipped: num(cells, P.made) + num(cells, P.waiting), est: num(cells, P.est) });
-    }
-    clients.push({ name: name, lines: lines });
-  }
-  if (!clients.length || !products.length) { say("客户表里没读到数量。", false); return; }
-  var text = JSON.stringify({ kind: "journal-clients-v1", year: year, at: new Date().toLocaleString(), clients: clients });
-  var box = say("已读到 <b>" + clients.length + "</b> 个客户（" + year + " 年度）。<br><small>现在到日志页面，在 C1有单老客 按「粘贴系统数量」。</small><br><textarea id='journal-clients-text' readonly style='width:100%;height:40px;font-size:11px'></textarea><small id='journal-clients-how'></small>", true);
-  var ta = document.getElementById("journal-clients-text");
-  ta.value = text; ta.focus(); ta.select();
-  var done = false;
-  try { done = document.execCommand("copy"); } catch (e) {}
-  document.getElementById("journal-clients-how").textContent = done ? "已经复制好了。" : "没能自动复制：请在上面的框里按 Ctrl+C。";
+// The ERP bookmark 复制本页 (smol_system tools/erp_bookmarks) copies a whole ERP page to the
+// clipboard: its boxes and every table with its column titles. 「粘贴系统数量」 below picks the
+// client table of 客户总表 out of that copy, by column titles, never by position: per client 简称
+// and product line (沙滩鞋, 室内鞋...) last year's orders (去年定单数量), this year's (已接定单数量),
+// 未出 = ordered but not shipped (已投产未出数 + 已接未投产数) and 估 (预估未下单数).
+function clientNumbers(copy) {
+  const tables = (copy && copy.kind === "erp-page-v1" && copy.tables) || [];
+  const t = tables.find(t => ["客户简称", "已接定单数量", "年度"].every(h => t.heads.includes(h)));
+  if (!t) return null;
+  const H = t.heads, col = (title, from = 0) => H.indexOf(title, from);
+  const num = (cells, i) => { const v = parseInt(String(cells[i] ?? "").replace(/[,\s]/g, ""), 10); return i < 0 || isNaN(v) ? 0 : v; };
+  // product lines: every column group titled <产品>已接定单数量; its 去年定单数量 comes after its first column
+  const products = [];
+  H.forEach((h, i) => {
+    const m = h.match(/^(.+)已接定单数量$/); if (!m) return;
+    const first = col(m[1] + "低估定单数量");
+    products.push({ name: m[1], ordered: i, last: col("去年定单数量", first < 0 ? Math.max(0, i - 10) : first),
+      made: col(m[1] + "已投产未出数"), waiting: col(m[1] + "已接未投产数"), est: col(m[1] + "预估未下单数") });
+  });
+  const nameCol = col("客户简称"), yearCol = col("年度");
+  let year = 0;
+  const clients = t.rows.filter(r => r.length >= H.length && String(r[nameCol]).trim()).map(r => {
+    year ||= num(r, yearCol);
+    return { name: String(r[nameCol]).replace(/\s+/g, "").toUpperCase(),
+      lines: products.map(P => ({ product: P.name, last: num(r, P.last), ordered: num(r, P.ordered),
+        unshipped: num(r, P.made) + num(r, P.waiting), est: num(r, P.est) })) };
+  });
+  return clients.length && products.length ? { year, clients } : null;
 }
-const bookmarkHref = fn => "javascript:" + encodeURIComponent("(" + fn.toString().split("\n").filter(l => !/^\s*\/\//.test(l)).join("\n") + ")();");
 
 // Fill the C1 clients from the copied numbers. Only clients already in the journal (matched by
 // 简称) are filled; a product line with no order last year or this year is left out.
 const CHG = new WeakMap();   // line -> { box key: old value }, to frame what the paste changed (until the page is reloaded)
 function applyClientNumbers(text) {
-  let d; try { d = JSON.parse(text); } catch (e) { d = null; }
-  if (!d || d.kind !== "journal-clients-v1") return { error: "这不是「复制客户数量」书签复制的内容。先在旧系统的客户总表页面点书签，再回来按这里。" };
+  let copy; try { copy = JSON.parse(text); } catch (e) { copy = null; }
+  if (!copy || copy.kind !== "erp-page-v1") return { error: "剪贴板里不是旧系统的页面。先在旧系统的「客户总表」页面点书签「复制本页」，再回来按这里。" };
+  const d = clientNumbers(copy);
+  if (!d) return { error: "复制的页面里没有客户数量表（" + (copy.title || copy.page) + "）。请在「客户总表」页面点「复制本页」。" };
   const y = 200 + d.year % 100;
   if (y !== curYear()) return { error: `系统页面是 ${d.year} 年度，日志现在是 ${curYear()} 年度：请在客户总表选对年度再复制。` };
   const by = {}; d.clients.forEach(c => { by[c.name] = c; });
@@ -816,12 +778,9 @@ function clientsSection() {
   const sec = section("C1有单老客", "每个客户：简称（4位）、前道/后道，每条产品线写各业务年度数量，下面加跟踪事项（前道每条产品线至少一条）。");
   // numbers from the old system: paste button + the bookmark that copies them there
   const sys = el("div", "irow sysrow");
-  const paste = el("button", "", "粘贴系统数量"); paste.title = "把「复制客户数量」书签复制的数量，填进下面简称对得上的客户";
+  const paste = el("button", "", "粘贴系统数量"); paste.title = "把旧系统「客户总表」的数量（用书签「复制本页」复制），填进下面简称对得上的客户";
   paste.addEventListener("click", pasteClientNumbers);
-  const bm = el("a", "bm", "复制客户数量"); bm.href = bookmarkHref(erpClientsBookmark);
-  bm.title = "把这个拖到浏览器的书签栏。以后在旧系统的 客户总表 页面点它。";
-  bm.addEventListener("click", e => { e.preventDefault(); toast("把它拖到书签栏，然后在旧系统的 客户总表 页面点它"); });
-  sys.append(paste, el("span", "hint", "数量不用手抄：把书签"), bm, el("span", "hint", "拖到书签栏，在旧系统「客户总表」页面点它，再回来按「粘贴系统数量」。"));
+  sys.append(paste, el("span", "hint", "数量不用手抄：在旧系统「客户总表」页面点书签「复制本页」，再回来按这里。"));
   sec.append(sys);
   S.clients.forEach(c => {
     const card = el("div", "ccard");
