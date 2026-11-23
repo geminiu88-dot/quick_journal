@@ -30,6 +30,10 @@ exact format on the right, made from the form. 「复制日志」 copies that te
 - 「以前的日志」: the text of each day, last 60 days.
 - The fixed lines (labels, boxes, counts) are the `DAILY` / `WEEKLY` lists at
   the top of the script; the importer reads lines with the same lists.
+  Only the values are boxes (numbers side by side, text below); the words
+  around them come from these lists. 上周 in 超30天样单数 is filled each Friday
+  from the week before. The template's notes （仅前道业务） / （仅有立项业务） are
+  left out of the generated lines.
 - **日常清单 tab** (the coded to-do list from the bosses). Paste messages: a
   code like `1019G-02` is found anywhere in a line (MMDD + letter + `-` + the
   day's number); each line with a code starts a new item. The letter says who

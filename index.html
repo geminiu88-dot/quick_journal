@@ -84,6 +84,7 @@
   .hint { color: var(--muted); font-size: 12px; margin: 0 0 8px; display: block; }
   .field { display: block; margin: 6px 0; }
   .flabel { display: block; font-size: 13px; font-weight: bold; }
+  .field.short { display: inline-block; vertical-align: top; margin-right: 12px; } .field.short input { width: 110px; background: var(--edit); }
   .field textarea, .field input, .icard textarea, .irow input, .irow select, .fsec button {
     font: inherit; font-size: 14px; padding: 3px 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--paper); color: var(--ink);
     appearance: auto; -webkit-appearance: auto; }
@@ -258,25 +259,56 @@ const DAILY = [
   ["*组内日常清单表：", { d: 1 }, "当天接收", { c: "tdIn" }, "，当天完成", { c: "tdDone" }, "，未结", { c: "tdOpen" }, "，传递：", { c: "tdSent" }],
   ["*接单/出货系统更新：", { d: 1 }, { f: "d2" }],
   ["*在手需下样还未下样款数：", { d: 1 }, { f: "d3" }],
-  ["*客户投诉：", { d: 1 }, { f: "d4" }, "，今入持续关注区登记客诉：", { c: "newComplaints" }, "条"],
+  ["*客户投诉：", { d: 1 }, "/", { f: "d4n" }, "条, 知会QC/QA：", { f: "d4q" }, "条；阿文确认收到：", { f: "d4c" }, "条，今入持续关注区登记客诉：", { c: "newComplaints" }, "条"],
 ];
+// only the values are boxes; the words around them are written by the page. {f, pre}: the text pre only when the box isn't empty
 const WEEKLY = [
-  ["*本周工厂意见/投诉：", { w: 1 }, { f: "w1" }],
-  ["*本周搜款推客：", { w: 1 }, { f: "w2" }],
-  ["*本周来联系我们C2C3C4客/新客数：", { w: 1 }, { f: "w3" }],
-  ["*负责C1C2客户数：", { w: 1 }, " C1日志", { c: "c1" }, "系统", { f: "w4a" }, ", C2日志", { c: "c2" }, "系统", { f: "w4b" }, { f: "w4c" }],
+  ["*本周工厂意见/投诉：", { w: 1 }, "投诉", { f: "w1n" }, { f: "w1t", pre: "，" }],
+  ["*本周搜款推客：", { w: 1 }, "/", { f: "w2n" }, "客", { f: "w2t" }, "，下周计划：", { f: "w2p" }],
+  ["*本周来联系我们C2C3C4客/新客数：", { w: 1 }, "/", { f: "w3n" }, "客，激活：", { f: "w3a" }, "，新入系统：", { f: "w3b" }, "；系统更新自评：", { f: "w3s" }],
+  ["*负责C1C2客户数：", { w: 1 }, " C1日志", { c: "c1" }, "系统", { f: "w4a" }, ", C2日志", { c: "c2" }, "系统", { f: "w4b" }, "；与系统客户总表校对时点：", { w: 1 }, "/", { f: "w4t" }, "完成"],
   ["*未结账务：", { w: 1 }, { f: "w5" }],
-  ["*已投产欠包装：", { w: 1 }, { f: "w6" }, "，持续关注区登记欠包装：", { c: "欠包装" }],
-  ["*测试未过：", { w: 1 }, { f: "w7" }, "，持续关注区登记：", { c: "测试未过" }],
+  ["*已投产欠包装：", { w: 1 }, "款", { f: "w6n" }, "，持续关注区登记欠包装：", { c: "欠包装" }],
+  ["*测试未过：", { w: 1 }, "款", { f: "w7n" }, "，持续关注区登记：", { c: "测试未过" }],
   ["*进度核对/船期预警：", { w: 1 }, "进度核对", { f: "w8a" }, "，船期预警", { f: "w8b" }, "；持续关注区登记：进度核对", { c: "进度核对" }, "船期预警", { c: "船期预警" }],
-  ["*品质关注点：", { w: 1 }, { f: "w9" }, "，持续关注区登记品质：", { c: "品质" }],
-  ["*待开客户会议/来访：", { w: 1 }, { f: "w10a" }, "，持续关注区登记会议：", { c: "会议" }, { f: "w10b" }],
-  ["*本周入系统订单款数：", { w: 1 }, { f: "w11" }],
-  ["*系统在手设计稿-业务模块：", { w: 1 }, { f: "w12" }],
-  ["*本周下样数：", { w: 1 }, { f: "w13" }],
-  ["*未完试样单数：", { w: 1 }, { f: "w14" }],
-  ["*本周超30天样单数：", { w: 1 }, { f: "w15a" }, { w: 1 }, { f: "w15b" }],
+  ["*品质关注点：", { w: 1 }, "需关注点", { f: "w9n" }, "，持续关注区登记品质：", { c: "品质" }],
+  ["*待开客户会议/来访：", { w: 1 }, "客", { f: "w10n" }, "，持续关注区登记会议：", { c: "会议" }, "，系统客户来访待开会议数", { f: "w10m" }, "；系统更新自评：", { f: "w10s" }],
+  ["*本周入系统订单款数：", { w: 1 }, "款", { f: "w11n" }, "，最久在手工作天数", { f: "w11d" }, "天，入系统速度自评：", { f: "w11s" }, "（", { f: "w11t" }, "）"],
+  ["*系统在手设计稿-业务模块：", { w: 1 }, "已通过未下样数", { f: "w12n" }, "，下样推进时效自评：", { f: "w12s" }, "（", { f: "w12t" }, "）"],
+  ["*本周下样数：", { w: 1 }, "样", { f: "w13n" }, "，最久在手工作天数", { f: "w13d" }, "天，下样速度自评：", { f: "w13s" }, "（", { f: "w13t" }, "）"],
+  ["*未完试样单数：", { w: 1 }, "单", { f: "w14n" }, "，无需试样备注描述合规自评：", { f: "w14s" }],
+  ["*本周超30天样单数：", { w: 1 }, "：", { f: "w15n" }, "单，上周", { f: "w15p" }, "单；本周最久已下样", { f: "w15d" },
+   "天；本周本人做了哪些推动工作/自评：", { w: 1 }, { f: "w15b" }, "/自评：", { f: "w15s" }],
 ];
+// the lines as they were before 2026-11-23 (one box per line), to carry typed values over into the new boxes
+const OLD_SPECS = [
+  ["*客户投诉：", { d: 1 }, { f: "d4" }, "，今入持续关注区登记客诉：", { c: 1 }, "条"],
+  ["*本周工厂意见/投诉：", { w: 1 }, { f: "w1" }], ["*本周搜款推客：", { w: 1 }, { f: "w2" }], ["*本周来联系我们C2C3C4客/新客数：", { w: 1 }, { f: "w3" }],
+  ["*负责C1C2客户数：", { w: 1 }, " C1日志", { c: 1 }, "系统", { f: "w4a" }, ", C2日志", { c: 1 }, "系统", { f: "w4b" }, { f: "w4c" }],
+  ["*已投产欠包装：", { w: 1 }, { f: "w6" }, "，持续关注区登记欠包装：", { c: 1 }], ["*测试未过：", { w: 1 }, { f: "w7" }, "，持续关注区登记：", { c: 1 }],
+  ["*品质关注点：", { w: 1 }, { f: "w9" }, "，持续关注区登记品质：", { c: 1 }],
+  ["*待开客户会议/来访：", { w: 1 }, { f: "w10a" }, "，持续关注区登记会议：", { c: 1 }, { f: "w10b" }],
+  ["*本周入系统订单款数：", { w: 1 }, { f: "w11" }], ["*系统在手设计稿-业务模块：", { w: 1 }, { f: "w12" }],
+  ["*本周下样数：", { w: 1 }, { f: "w13" }], ["*未完试样单数：", { w: 1 }, { f: "w14" }],
+];
+const NOTE_RE = /[（(]仅(前道|后道|有立项)业务[）)]/g;   // the template's notes for the reader, not part of a line
+function migrateFields(f) {
+  if (!f) return;
+  OLD_SPECS.forEach(old => {
+    const keys = old.filter(p => p.f).map(p => p.f), now = [...DAILY, ...WEEKLY].find(sp => sp[0] === old[0]);
+    if (!keys.some(k => k in f) || keys.every(k => now.some(p => p.f === k))) return;
+    const t = old.map(p => typeof p === "string" ? p : p.f ? (f[p.f] || "") : p.c ? "0" : "0000").join("").replace(NOTE_RE, "");
+    const m = (f[keys[0]] || "").trim() && t.match(specRe(now));
+    if (m) now.filter(p => p.f).forEach((p, i) => { f[p.f] = (m[i + 1] || "").trim(); });
+    keys.forEach(k => { if (!now.some(p => p.f === k)) delete f[k]; });
+  });
+  if ("w15a" in f) {   // 2026-11-23 morning: the 超30天 line had two boxes
+    const t = "*本周超30天样单数：0000" + (f.w15a || "") + "0000" + (f.w15b || ""), m = t.match(specRe(WEEKLY[WEEKLY.length - 1]));
+    if (m) ["w15n", "w15p", "w15d", "w15b", "w15s"].forEach((k, i) => { f[k] = (m[i + 1] || "").trim(); }); else delete f.w15b;
+    delete f.w15a;
+  }
+}
+
 const fieldsOf = lines => lines.flat().filter(p => p.f).map(p => p.f);
 
 // ---------- storage ----------
@@ -305,7 +337,9 @@ function newDay() {
   S.entries = [];
   fieldsOf(DAILY).forEach(k => { S.f[k] = ""; });
   if (DAY.getDay() === 5) {                                  // Friday: weekly review starts empty, dated today
+    const lastWeek = S.f.w15n || "";                       // this week's 超30天样单数 becomes next week's 上周
     fieldsOf(WEEKLY).forEach(k => { S.f[k] = ""; });
+    S.f.w15p = lastWeek;
     S.weekDate = today();
   }
   if (last && iso(monday(DAY)) !== iso(monday(last))) {      // first entry of a new week: W-items get the new week no.
@@ -333,18 +367,18 @@ function seed() {
     d1: "当天接收4，当天完成3，未结2，传递：17：50已传",
     d2: "已接单未入系统：AAA/2款0.6W啥原因1029（仅前道业务）；已接单未交接后道：AAA/2款/客已下单2天（仅前道业务）；已出货未更新系统：AAA/2.5W 1029（仅后道业务）",
     d3: "款2：AAA款1，ABC款1，打算如何1029",
-    d4: "/1条, 知会QC/QA：1条；阿文确认收到：1条",
-    w1: "投诉2，某厂投诉如何如何，某某厂投诉如何如何",
-    w2: "/2客AAA/22款，BBB/50款，下周计划：1客CEC1024（仅前道业务）",
-    w3: "/2客，激活：1/某国DDD，新入系统：1/某国CENTE；系统更新自评：5（仅前道业务）",
-    w4a: "4", w4b: "1", w4c: "；与系统客户总表校对时点：1017/14:30完成（仅前道业务）",
-    w5: "如何如何", w6: "款1", w7: "款1", w8a: "2", w8b: "1", w9: "需关注点2",
-    w10a: "客1", w10b: "，系统客户来访待开会议数1；系统更新自评：5",
-    w11: "款5，最久在手工作天数1天，入系统速度自评：5（）",
-    w12: "已通过未下样数2，下样推进时效自评：4（如何如何）（仅有立项业务）",
-    w13: "样3，最久在手工作天数1天，下样速度自评：5（）",
-    w14: "单3，无需试样备注描述合规自评：5",
-    w15a: "：1单，上周2单；本周最久已下样119天；本周本人做了哪些推动工作/自评：", w15b: "如何如何/自评：4.5",
+    d4n: "1", d4q: "1", d4c: "1",
+    w1n: "2", w1t: "某厂投诉如何如何，某某厂投诉如何如何",
+    w2n: "2", w2t: "AAA/22款，BBB/50款", w2p: "1客CEC1024",
+    w3n: "2", w3a: "1/某国DDD", w3b: "1/某国CENTE", w3s: "5",
+    w4a: "4", w4b: "1", w4t: "14:30",
+    w5: "如何如何", w6n: "1", w7n: "1", w8a: "2", w8b: "1", w9n: "2",
+    w10n: "1", w10m: "1", w10s: "5",
+    w11n: "5", w11d: "1", w11s: "5", w11t: "",
+    w12n: "2", w12s: "4", w12t: "如何如何",
+    w13n: "3", w13d: "1", w13s: "5", w13t: "",
+    w14n: "3", w14s: "5",
+    w15n: "1", w15p: "2", w15d: "119", w15b: "如何如何", w15s: "4.5",
   };
   s.remind = [it("W" + isoWeek(DAY), "", "周一传未完日常清单表，1020已传（或：1020无未完记录），下周", "1027", false)];
   s.focus = [
@@ -496,7 +530,7 @@ function specText(spec) {
     if (p.d) return T();
     if (p.w) return mmdd(fromIso(S.weekDate));
     if (p.c) return String(calcValue(p.c));
-    const v = (S.f[p.f] || "").trim(); if (!v) bad = "有空没填"; return v;
+    const v = (S.f[p.f] || "").trim(); if (!v && kindOf(p.f) !== "o" && !p.pre) bad = "有空没填"; return v && p.pre ? p.pre + v : v;
   }).join("");
   return { t, bad };
 }
@@ -592,30 +626,40 @@ function hoursSection() {
 }
 
 // plain-language names for the boxes of the fixed lines; [label, hint]
+// [label, hint, kind]: kind "n" = a short box (a number), "o" = may stay empty
 const FIELD_HELP = {
   d2: ["接单/出货系统还没更新的", "按这三项写：已接单未入系统 / 已接单未交接后道 / 已出货未更新系统（客户/款数/数量，原因，计划日期）"],
   d3: ["手上要下样、还没下样的款", "款数：哪个客户几款，打算怎么办 + 计划日期"],
-  d4: ["今天的客户投诉", "/条数, 知会QC/QA：条数；阿文确认收到：条数"],
-  w1: ["本周工厂意见/投诉"], w2: ["本周搜款推客", "/几个客 客户/款数，下周计划"], w3: ["本周来联系我们的C2C3C4客/新客"],
-  w4a: ["C1客户数（系统里）"], w4b: ["C2客户数（系统里）"], w4c: ["与系统客户总表校对", "接在后面，如 ；与系统客户总表校对时点：1017/14:30完成"],
-  w5: ["未结账务"], w6: ["已投产欠包装", "款数，如 款1"], w7: ["测试未过", "款数，如 款1"],
-  w8a: ["进度核对 条数"], w8b: ["船期预警 条数"], w9: ["品质关注点", "如 需关注点2"],
-  w10a: ["待开客户会议/来访", "如 客1"], w10b: ["会议后面的内容", "如 ，系统客户来访待开会议数1；系统更新自评：5"],
-  w11: ["本周入系统订单款数"], w12: ["系统在手设计稿-业务模块"], w13: ["本周下样数"], w14: ["未完试样单数"],
-  w15a: ["本周超30天样单数"], w15b: ["本周本人做了哪些推动工作/自评"],
+  d4n: ["投诉条数", "", "n"], d4q: ["知会QC/QA", "", "n"], d4c: ["阿文确认收到", "", "n"],
+  w1n: ["投诉数", "", "n"], w1t: ["哪个厂投诉什么", "没有就空着", "o"],
+  w2n: ["推了几个客", "", "n"], w2t: ["客户/款数"], w2p: ["下周计划"],
+  w3n: ["客数", "", "n"], w3s: ["系统更新自评", "", "n"], w3a: ["激活"], w3b: ["新入系统"],
+  w4a: ["C1（系统里）", "", "n"], w4b: ["C2（系统里）", "", "n"], w4t: ["校对时间", "", "n"],
+  w5: ["未结账务"], w6n: ["款数", "", "n"], w7n: ["款数", "", "n"],
+  w8a: ["进度核对", "", "n"], w8b: ["船期预警", "", "n"], w9n: ["需关注点", "", "n"],
+  w10n: ["客数", "", "n"], w10m: ["系统待开会议数", "", "n"], w10s: ["系统更新自评", "", "n"],
+  w11n: ["款数", "", "n"], w11d: ["最久在手天数", "", "n"], w11s: ["自评", "", "n"], w11t: ["括号里的说明", "没有就空着", "o"],
+  w12n: ["已通过未下样数", "", "n"], w12s: ["自评", "", "n"], w12t: ["括号里的说明", "没有就空着", "o"],
+  w13n: ["样数", "", "n"], w13d: ["最久在手天数", "", "n"], w13s: ["自评", "", "n"], w13t: ["括号里的说明", "没有就空着", "o"],
+  w14n: ["单数", "", "n"], w14s: ["自评", "", "n"],
+  w15n: ["本周单数", "", "n"], w15p: ["上周单数", "周五自动填", "n"], w15d: ["最久已下样天数", "", "n"], w15s: ["自评", "", "n"],
+  w15b: ["本周本人做了哪些推动工作"],
 };
+const kindOf = k => (FIELD_HELP[k] || [])[2] || "";
+
 let EXAMPLE = null;   // the template's example values, shown in empty boxes
 function specFields(sec, spec) {
   EXAMPLE ||= seed().f;
   const g = el("div", "fgroup");
-  spec.filter(p => p.f).forEach(p => {
-    const [label, hint] = FIELD_HELP[p.f] || [p.f];
+  const fs = spec.filter(p => p.f), isShort = p => kindOf(p.f) === "n";
+  [...fs.filter(isShort), ...fs.filter(p => !isShort(p))].forEach(p => {   // the number boxes side by side first
+    const [label, hint, kind] = FIELD_HELP[p.f] || [p.f], short = kind === "n";
     const prev = S.prev && S.prev.f && S.prev.f[p.f];
-    const f = el("label", "field"); f.append(el("span", "flabel", label));
-    const box = textBox(() => S.f[p.f] || "", v => { S.f[p.f] = v; }, prev ? "上次：" + prev : "例：" + (EXAMPLE[p.f] || ""), true);
-    refreshers.push(() => box.classList.toggle("bad", !(S.f[p.f] || "").trim()));
+    const f = el("label", short ? "field short" : "field"); f.append(el("span", "flabel", label));
+    const box = textBox(() => S.f[p.f] || "", v => { S.f[p.f] = v; }, prev ? "上次：" + prev : "例：" + (EXAMPLE[p.f] || ""), !short);
+    if (kind !== "o" && !p.pre) refreshers.push(() => box.classList.toggle("bad", !(S.f[p.f] || "").trim()));
     f.append(box);
-    if (prev) {
+    if (prev && !short) {
       const same = el("button", "same", "用上次的");
       same.addEventListener("click", e => { e.preventDefault(); S.f[p.f] = prev; box.value = prev; box.dispatchEvent(new Event("input")); });
       f.append(same);
@@ -863,6 +907,7 @@ function render() {
   S.clients.forEach(c => c.lines.forEach(l => { l.items = l.items.filter(alive); }));
   migrateHours();
   migrateClients();
+  migrateFields(S.f); migrateFields(S.prev && S.prev.f);
   renderForm();
   save();
 }
@@ -888,7 +933,7 @@ function litRe(s) {
   }).join("\\s*");
 }
 function specRe(spec) {
-  return new RegExp("^" + spec.map(p => typeof p === "string" ? litRe(p) : p.f ? "(.*?)" : p.c ? ".*?" : "\\s*\\d{4}\\s*").join("") + "\\s*$");
+  return new RegExp("^" + spec.map(p => typeof p === "string" ? litRe(p) : p.f ? (p.pre ? "(?:" + litRe(p.pre) + "(.*?))?" : "(.*?)") : p.c ? ".*?" : "\\s*\\d{4}\\s*").join("") + "\\s*$");
 }
 function parseItem(t, withCat) {
   const m = t.match(/^[+\-－–—]\s*(W\d+|M\d+|\d{4})?\s*(.*?)\s*(\d{4}|[Xx])?\s*$/);
@@ -930,10 +975,11 @@ function parseJournal(raw) {
     if (/^●\s*C2\s*目标客/.test(t)) { sec = "c2"; read++; continue; }
     if (sec === "skip") continue;
     if (sec === "daily" || sec === "weekly") {
+      t = t.replace(NOTE_RE, "");
       const spec = (sec === "daily" ? DAILY : WEEKLY).find(sp => specRe(sp).test(t));
       if (!spec) { missed.push(t); continue; }
       const vals = t.match(specRe(spec)).slice(1);
-      spec.filter(p => p.f).forEach((p, i) => { s.f[p.f] = vals[i].trim(); });
+      spec.filter(p => p.f).forEach((p, i) => { s.f[p.f] = (vals[i] || "").trim(); });
       read++; continue;
     }
     if (/^[+\-－–—]/.test(t)) {
