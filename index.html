@@ -1545,9 +1545,17 @@ const AFTER_FILTER = ["sortState", "dataConsolidate", "customSheetViews", "merge
 // An imported Excel is changed in place: its rows stay where they are (so comments, pictures and
 // hidden rows stay right), only rows edited here are rewritten, new items go at the bottom.
 function rowMap(sd) { return new Map([...sd.getElementsByTagName("row")].map(r => [+r.getAttribute("r"), r])); }
+// a cell the file doesn't have yet takes the style (borders, date format) of the same column in the rows above
+function styleAbove(row, col) {
+  for (let r = row.previousElementSibling, n = 0; r && n < 300; r = r.previousElementSibling, n++) {
+    const c = [...r.getElementsByTagName("c")].find(c => colNum(c.getAttribute("r")) === col);
+    if (c && c.getAttribute("s") && r.getAttribute("r") !== "1") return c.getAttribute("s");
+  }
+  return null;
+}
 function setCell(d, row, ref, kind, val) {
   const old = [...row.getElementsByTagName("c")].find(c => c.getAttribute("r") === ref);
-  const c = cell(d, ref, old ? old.getAttribute("s") : null, kind, val);
+  const c = cell(d, ref, (old && old.getAttribute("s")) || styleAbove(row, colNum(ref)), kind, val);
   if (old) { row.replaceChild(c, old); return; }
   const after = [...row.getElementsByTagName("c")].find(e => colNum(e.getAttribute("r")) > colNum(ref));
   row.insertBefore(c, after || null);
@@ -1835,8 +1843,8 @@ async function storeTemplate(u8) {
 
 async function buildXlsx() {
   const td = TD();
-  // 须知 6: an item that was OK and already sent once gets 先前已传 = 1
-  td.items.forEach(x => { if (status(x) === "OK" && x.okSent && !x.sent) { x.sent = 1; x.edited = true; } });
+  // 须知 6: an item closed before today (打X登记日期) counts as already sent: 先前已传 = 1, row hidden (owner, 2026-11-24)
+  td.items.forEach(x => { if (status(x) === "OK" && x.xDate && x.xDate < today() && !x.sent) { x.sent = 1; x.edited = true; } });
   const bytes = await templateBytes();
   if (!bytes) throw new Error("找不到导入时存下的Excel，请再导入一次你最新的Excel");
   const B = book(await unzip(bytes.buffer));
@@ -1881,7 +1889,6 @@ async function downloadXlsx() {
   const a = el("a"); a.href = URL.createObjectURL(blob); a.download = name; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
   td.sends.push({ day: today(), time: String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0") });
   td.sends = td.sends.slice(-200);
-  td.items.forEach(x => { if (status(x) === "OK") x.okSent = true; });
   save(); renderTodo(); refresh();
   toast("已下载 " + name);
 }

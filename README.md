@@ -40,7 +40,7 @@ exact format on the right, made from the form. 「复制日志」 copies that te
   sent it: `SOURCES` at the top of the to-do script (group B01's letters,
   other groups may differ). Status follows 须知 5: `OK` when the last note line
   ends in X (打X登记日期 = that day), `G` when a note line starts with today's
-  date. 先前已传 = 1 once an OK item has been sent before (须知 6). The journal's
+  date. 先前已传 = 1 (row hidden by the filter) at the first download after the day it was closed (打X登记日期 before today; 须知 6). The journal's
   `*组内日常清单表` line is filled from this list.
   The big boss is everyone's direct boss too: `G` (to the whole group) goes on
   01直接上级, no letter (to one person) on his own sheet, 01间接上级.
