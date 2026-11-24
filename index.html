@@ -1003,7 +1003,17 @@ function parseJournal(raw) {
 // ---------- toolbar ----------
 const dayInput = document.getElementById("day");
 dayInput.value = today();
-dayInput.addEventListener("change", () => { if (!dayInput.value) return; DAY = fromIso(dayInput.value); render(); });
+const realToday = () => { const n = new Date(); return iso(new Date(n.getFullYear(), n.getMonth(), n.getDate())); };
+let pickedDay = false;   // true while a past day is chosen by hand in the date box
+dayInput.addEventListener("change", () => { if (!dayInput.value) return; DAY = fromIso(dayInput.value); pickedDay = dayInput.value !== realToday(); render(); });
+// a page left open overnight moves to the new day when you come back to it (else the journal date and
+// the 02新增统计 zeros stay on yesterday)
+function followClock() {
+  if (pickedDay || today() === realToday()) return;
+  DAY = fromIso(realToday()); dayInput.value = today(); render();
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden) followClock(); });
+window.addEventListener("focus", followClock);
 
 document.getElementById("copy").addEventListener("click", async () => {
   save();
@@ -1842,6 +1852,7 @@ async function storeTemplate(u8) {
 }
 
 async function buildXlsx() {
+  followClock();
   const td = TD();
   // 须知 6: an item closed before today (打X登记日期) counts as already sent: 先前已传 = 1, row hidden (owner, 2026-11-24)
   td.items.forEach(x => { if (status(x) === "OK" && x.xDate && x.xDate < today() && !x.sent) { x.sent = 1; x.edited = true; } });
