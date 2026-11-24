@@ -77,4 +77,10 @@ exact format on the right, made from the form. 「复制日志」 copies that te
   Only clients already in the journal are filled; a product line with no
   order in either year is left out; changed boxes get a blue frame with the
   old value as a tooltip. Nothing about the old system is stored in this page.
+- **评估单 tab** (sample evaluation, 鞋N评估单-客户-描述.txt): boxes for the
+  values, the numbered text 1）…12） written by the page; 产品线 鞋1 夏季凉鞋 /
+  鞋2 室内软拖鞋; names under 10） kept as chips. Saved on this PC with the
+  journal (`S.evals`, in the backup). 「导入txt」 reads old ones (GBK or
+  UTF-8, lines found by number); 「下一轮」 starts the next round with 9） =
+  this round's 11） and 12） 初定 copied. 「下载txt」 = UTF-8 with BOM, CRLF.
 - Not done yet: business-year rollover on 31 Oct (rule 10), other teams' formats.

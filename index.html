@@ -68,8 +68,22 @@
   .tabs { display: inline-flex; margin-right: 8px; }
   .tabs button { border-radius: 0; }
   .tabs button:first-child { border-radius: 6px 0 0 6px; } .tabs button:last-child { border-radius: 0 6px 6px 0; margin-left: -1px; }
-  body[data-tab="journal"] #tabJournal, body[data-tab="todo"] #tabTodo { background: var(--ink); color: var(--paper); border-color: var(--ink); }
-  body[data-tab="journal"] .tonly, body[data-tab="todo"] .jonly { display: none !important; }
+  body[data-tab="journal"] #tabJournal, body[data-tab="todo"] #tabTodo, body[data-tab="eval"] #tabEval { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  body[data-tab="journal"] .tonly, body[data-tab="todo"] .jonly, body[data-tab="eval"] .tonly, body[data-tab="eval"] .jonly,
+  body:not([data-tab="eval"]) .eonly { display: none !important; }
+  .tabs button:not(:first-child) { margin-left: -1px; }
+  .evhead { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 10px; }
+  .evhead select { min-width: 260px; }
+  .evrow { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: end; margin: 6px 0; }
+  .evrow .field { margin: 0; } .evrow .field input { width: 90px; background: var(--edit); }
+  .evrow .field.wide input { width: 220px; }
+  .pt { display: flex; gap: 6px; align-items: start; margin: 4px 0; } .pt textarea { flex: 1; }
+  .pt select { width: 46px; } .chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 2px 0 6px 52px; }
+  .chip { font-size: 12px; padding: 1px 8px; border: 1px solid var(--border); border-radius: 10px; cursor: pointer; background: var(--paper); color: var(--muted); }
+  .chip.on { background: var(--ui); border-color: var(--ui); color: #fff; }
+  .chips input { width: 90px; font-size: 12px; padding: 1px 6px; }
+  .pt textarea, .pt select, .evhead select, .evrow select, .chips input { font: inherit; font-size: 14px; padding: 3px 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--paper); color: var(--ink); }
+  .pt textarea { background: var(--edit); resize: none; overflow: hidden; line-height: 1.5; } .chips input { font-size: 12px; padding: 1px 6px; }
   .todohead { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 12px; }
   .fname { font-weight: bold; }
   .jgrid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; align-items: start; }
@@ -174,7 +188,7 @@
 </head>
 <body>
 <div class="bar">
-  <span class="tabs"><button id="tabJournal">日志</button><button id="tabTodo">日常清单</button></span>
+  <span class="tabs"><button id="tabJournal">日志</button><button id="tabTodo">日常清单</button><button id="tabEval">评估单</button></span>
   日期 <input type="date" id="day">
   <span class="jonly"><button class="main" id="copy">复制日志</button>
   <button id="week" title="把每周回顾的日期和统计数字更新到今天">周五更新统计</button>
@@ -184,6 +198,8 @@
   <button id="prevToggle">隐藏日志文字</button></span>
   <span class="tonly"><button class="main" id="xlsxOut">下载Excel</button>
   <label class="btn">导入Excel<input type="file" id="xlsxIn" accept=".xlsx" hidden></label></span>
+  <span class="eonly"><button class="main" id="evCopy">复制评估单</button> <button id="evTxt">下载txt</button>
+  <label class="btn">导入txt<input type="file" id="evIn" accept=".txt" multiple hidden></label></span>
   <button id="export">备份到文件</button>
   <label class="btn">从备份恢复<input type="file" id="import" accept=".json" hidden></label>
   <span class="msg" id="msg"></span>
@@ -197,6 +213,13 @@
     </div>
   </div>
   <div id="todo" class="tonly"></div>
+  <div class="jgrid eonly">
+    <div id="evForm"></div>
+    <div class="prevwrap">
+      <div class="prevhead"><b>评估单文字</b>（自动生成；按「复制评估单」或「下载txt」）</div>
+      <div class="doc" id="evDoc"></div>
+    </div>
+  </div>
   <details class="jonly">
     <summary>日志规则（参考，不复制进日志）</summary>
     <pre id="rules"></pre>
@@ -1049,7 +1072,7 @@ document.getElementById("impCheck").addEventListener("click", () => {
 });
 impDo.addEventListener("click", () => {
   if (!parsed || !confirm("用这份日志替换页面上现在的内容？")) return;
-  const keep = { archive: S.archive, todo: S.todo }; S = parsed.s; Object.assign(S, keep);
+  const keep = { archive: S.archive, todo: S.todo, evals: S.evals }; S = parsed.s; Object.assign(S, keep);
   S.prev = { f: { ...S.f }, hours: S.hours.map(h => ({ ...h })) };
   impDlg.close(); render(); toast("已导入");
 });
@@ -1946,11 +1969,224 @@ async function importXlsx(file) {
   return { items, fsheets, bytes: new Uint8Array(buf) };
 }
 
+// ---------- 评估单 (sample evaluation) ----------
+// One evaluation per sample round, saved on this PC with the journal (S.evals, so 备份到文件 has them too).
+// Only the values are boxes; the numbered lines are written by the page, as in 鞋1评估单-PEP3-….txt.
+// e.style holds the 客户 (e.g. PEP3); e.shoe the product line (鞋1 = 夏季凉鞋, 鞋2 = 室内软拖鞋…).
+// 9) 上次样最终结论 = item 11 of the last round of the same 客户 + 描述. Names under 10) are remembered as chips.
+const EV_SHOES = [["1", "鞋1 夏季凉鞋"], ["2", "鞋2 室内软拖鞋"]];
+const EV_MOLD = [["no", "模具编号"], ["factory", "模具厂"], ["ratio", "倍率"], ["spec", "规格"], ["weight", "克重"]];
+function EV() {
+  if (!S.evals) S.evals = { list: [], names: [], cur: null };
+  return S.evals;
+}
+function evNew(from) {
+  const e = { id: "ev" + Date.now(), shoe: from ? from.shoe : "1", style: from ? from.style : "", title: from ? from.title : "",
+    qty: "", got: T(), len: "", fw: "", bw: "", thick: "", hard: "", weight: "", fit: "", color: "",
+    last: from ? from.end : "", points: [], end: "", mold: from ? { ...from.mold } : {}, made: today() };
+  EV().list.push(e); EV().cur = e.id; return e;
+}
+function evCur() { const v = EV(); return v.list.find(e => e.id === v.cur) || null; }
+function evPrev(e) {   // the latest other round of the same 客户 + 描述
+  return EV().list.filter(x => x !== e && x.style && x.style === e.style && x.title === e.title && x.made <= e.made && EV().list.indexOf(x) < EV().list.indexOf(e)).pop() || null;
+}
+function evText(e) {
+  const pts = e.points.filter(p => p.text.trim()).map(p => (p.sign || "+") + p.text.trim() + (p.names.length ? "（" + p.names.join(", ") + "）" : ""));
+  return [
+    "1）样品属性/本次收样数量：" + e.qty,
+    "2）收到本次样品4位数值日期：" + e.got,
+    "3）中底长度/前掌宽/后掌宽 " + [e.len, e.fw, e.bw].join("/"),
+    "4）底台厚度数值：" + e.thick,
+    "5）底台各部位硬度数值：" + e.hard,
+    "6）尺码/单只净克重：" + e.weight,
+    "7）试穿感受或套楦评估：" + e.fit,
+    "8）最看好哪个配色（多色样时填）" + (e.color.trim() ? "：" + e.color.trim() : ""),
+    "9）上次样最终结论简述：" + (e.last.trim() || "无"),
+    "10）本次设计/业务综合评估：", ...pts,
+    "11）最终结论（打算如何继续）：", ...(e.end.trim() ? [e.end.trim()] : []),
+    "12）初定：", ...EV_MOLD.map(([k, l]) => l + "：" + (e.mold[k] || "")),
+  ].join("\n");
+}
+const evFile = e => "鞋" + (e.shoe || "1") + "评估单-" + (e.style || "客户") + "-" + (e.title || "描述") + ".txt";
+
+// 导入txt: an evaluation written before (GBK from Notepad, or UTF-8) becomes a saved round, so 下一轮 can follow it.
+// The file name gives 鞋几/客户/描述; lines are found by their numbers 1）…12）, never by position.
+function evParse(text, fileName) {
+  const e = { id: "ev" + Date.now() + Math.random().toString(36).slice(2, 6), shoe: "1", style: "", title: "", qty: "", got: "", len: "", fw: "", bw: "",
+    thick: "", hard: "", weight: "", fit: "", color: "", last: "", points: [], end: "", mold: {}, made: today() };
+  const fm = (fileName || "").replace(/\.txt$/i, "").match(/^鞋(\d+)评估单-([^-]+)-(.+)$/);
+  if (fm) { e.shoe = fm[1]; e.style = fm[2]; e.title = fm[3]; }
+  const KEYS = { 1: "qty", 2: "got", 4: "thick", 5: "hard", 6: "weight", 7: "fit", 8: "color", 9: "last" };
+  const after = t => { const i = t.search(/[：:]/); return i < 0 ? "" : t.slice(i + 1).trim(); };
+  let item = 0, missed = [];
+  const known = EV().names;
+  text.replace(/^\ufeff/, "").split(/\r?\n/).map(l => l.trim()).filter(Boolean).forEach(l => {
+    const m = l.match(/^(\d{1,2})\s*[）)]\s*(.*)$/);
+    if (m && +m[1] >= 1 && +m[1] <= 12 && +m[1] > item) {
+      item = +m[1]; const rest = m[2];
+      if (item === 3) { const n = rest.match(/([\d.]+)\s*\/\s*([\d.]+)\s*\/\s*([\d.]+)\s*$/); if (n) [e.len, e.fw, e.bw] = [n[1], n[2], n[3]]; }
+      else if (KEYS[item]) e[KEYS[item]] = after(rest);
+      else if (item === 11) e.end = after(rest);
+      if (item === 9 && e.last === "无") e.last = "";
+      return;
+    }
+    if (item === 10 && /^[+\-－−]/.test(l)) {
+      let t = l.slice(1).trim(), names = [];
+      const nm = t.match(/[（(]([^（）()]*)[）)]\s*$/);
+      const parts = nm ? nm[1].split(/[,，、]/).map(x => x.trim()).filter(Boolean) : [];
+      if (parts.length && parts.every(x => /^[A-Za-z][A-Za-z .'-]{0,15}$/.test(x))) {
+        names = parts.map(x => { const k = known.find(n => n.toUpperCase() === x.toUpperCase()); if (k) return k; const n = x.toUpperCase(); known.push(n); return n; });
+        t = t.slice(0, nm.index).trim();
+      }
+      e.points.push({ sign: l[0] === "+" ? "+" : "-", text: t, names }); return;
+    }
+    if (item === 11) { e.end = (e.end ? e.end + "\n" : "") + l; return; }
+    if (item === 12) {
+      const k = EV_MOLD.find(([, lab]) => l.startsWith(lab));
+      if (k) { e.mold[k[0]] = after(l); return; }
+    }
+    missed.push(l);
+  });
+  return { e, missed, ok: item >= 10 };
+}
+async function evReadFile(f) {
+  const buf = await f.arrayBuffer();
+  try { return new TextDecoder("utf-8", { fatal: true }).decode(buf); } catch (err) { return new TextDecoder("gbk").decode(buf); }
+}
+
+function renderEval() {
+  const box = document.getElementById("evForm"); box.innerHTML = "";
+  const v = EV(); let e = evCur();
+  const head = el("div", "evhead");
+  const sel = el("select");
+  opt(sel, "", v.list.length ? "选一张以前的评估单…" : "还没有评估单");
+  [...v.list].reverse().forEach(x => opt(sel, x.id, x.made.slice(5).replace("-", "") + "　" + evFile(x).replace(/\.txt$/, "")));
+  sel.value = e ? e.id : "";
+  sel.addEventListener("change", () => { v.cur = sel.value || null; changed(); renderEval(); });
+  const add = el("button", "", "＋ 新评估单"); add.addEventListener("click", () => { evNew(); changed(); renderEval(); });
+  head.append(sel, add);
+  if (e) {
+    const next = el("button", "", "下一轮"); next.title = "同一个客户、同一个评估的新一轮：第9项自动用这张的第11项结论，初定照抄";
+    next.addEventListener("click", () => { evNew(e); changed(); renderEval(); });
+    const del = el("button", "", "删除这张");
+    del.addEventListener("click", () => { if (!confirm("删除「" + evFile(e) + "」？")) return; v.list = v.list.filter(x => x !== e); v.cur = null; changed(); renderEval(); });
+    head.append(next, del);
+  }
+  box.append(head);
+  if (!e) { box.append(el("p", "hint", "按「＋ 新评估单」开始，或按「导入txt」读进以前写的评估单。每一轮样品一张；同一个评估的下一轮按「下一轮」。")); showEval(); return; }
+
+  const upd = () => { changed(); showEval(); };
+  const small = (label, key, obj = e, cls = "", ph = "") => {
+    const f = el("label", "field " + cls); f.append(el("span", "flabel", label));
+    const i = el("input"); i.value = obj[key] || ""; i.placeholder = ph;
+    i.addEventListener("input", () => { obj[key] = i.value; upd(); }); f.append(i); return f;
+  };
+  const big = (label, key, ph = "") => {
+    const f = el("label", "field"); f.append(el("span", "flabel", label));
+    f.append(textBox(() => e[key] || "", val => { e[key] = val; showEval(); }, ph, true)); return f;
+  };
+  const sec1 = section("文件", "文件名：鞋几评估单-客户-描述.txt", box);
+  const r0 = el("div", "evrow");
+  const shoeF = el("label", "field"); shoeF.append(el("span", "flabel", "产品线"));
+  const shoeSel = el("select"); EV_SHOES.forEach(([v, t]) => opt(shoeSel, v, t));
+  if (!EV_SHOES.some(([v]) => v === e.shoe)) opt(shoeSel, e.shoe, "鞋" + e.shoe);
+  shoeSel.value = e.shoe; shoeSel.addEventListener("change", () => { e.shoe = shoeSel.value; changed(); renderEval(); });
+  shoeF.append(shoeSel);
+  const styleF = small("客户", "style", e, "", "PEP3");
+  styleF.querySelector("input").addEventListener("change", () => {   // the same 客户 + 描述 done before: 9) and 12) from it
+    const p = evPrev(e); if (!p) return;
+    if (!e.last.trim()) e.last = p.end;
+    EV_MOLD.forEach(([k]) => { if (!e.mold[k] && p.mold[k]) e.mold[k] = p.mold[k]; });
+    changed(); renderEval();
+  });
+  const titleF = small("描述", "title", e, "wide", "玛丽珍射出鞋开模评估");
+  titleF.querySelector("input").addEventListener("change", () => styleF.querySelector("input").dispatchEvent(new Event("change")));
+  r0.append(shoeF, styleF, titleF);
+  sec1.append(r0);
+
+  const sec2 = section("样品", "", box);
+  const r1 = el("div", "evrow");
+  r1.append(small("1 样品属性/收样数量", "qty", e, "wide"), small("2 收样日期", "got", e, "", "MMDD"));
+  const r2 = el("div", "evrow");
+  r2.append(small("3 中底长度", "len"), small("前掌宽", "fw"), small("后掌宽", "bw"));
+  sec2.append(r1, r2,
+    big("4 底台厚度数值", "thick"), big("5 底台各部位硬度数值", "hard", "如 中底42"),
+    big("6 尺码/单只净克重", "weight", "如 91克（含滴标和滴塑后跟带）"), big("7 试穿感受或套楦评估", "fit", "如 37码楦头套楦OK"),
+    big("8 最看好哪个配色（多色样时填）", "color", "单色样空着"));
+  const p = evPrev(e);
+  sec2.append(big("9 上次样最终结论简述", "last", p ? "上一轮（" + p.made.slice(5) + "）的结论：" + p.end : "第一轮空着 = 无"));
+
+  const sec3 = section("10 本次设计/业务综合评估", "每条一行：+ 好的，− 要改的；点名字标出是谁说的。", box);
+  const known = v.names;
+  e.points.forEach((pt, i) => {
+    const row = el("div", "pt");
+    const sg = el("select"); opt(sg, "+", "+"); opt(sg, "-", "−"); sg.value = pt.sign || "+";
+    sg.addEventListener("change", () => { pt.sign = sg.value; upd(); });
+    row.append(sg, textBox(() => pt.text, val => { pt.text = val; showEval(); }, "说的什么", true),
+      xBtn("删掉这条", () => { e.points.splice(i, 1); changed(); renderEval(); }));
+    const chips = el("div", "chips");
+    known.forEach(n => {
+      const c = el("span", "chip" + (pt.names.includes(n) ? " on" : ""), n);
+      c.addEventListener("click", () => { pt.names = pt.names.includes(n) ? pt.names.filter(x => x !== n) : [...pt.names, n].sort((a, b) => known.indexOf(a) - known.indexOf(b)); c.classList.toggle("on"); upd(); });
+      chips.append(c);
+    });
+    const nn = el("input"); nn.placeholder = "＋ 名字";
+    nn.addEventListener("keydown", ev => {
+      if (ev.key !== "Enter") return; ev.preventDefault();
+      const n = nn.value.trim(); if (!n) return;
+      if (!known.includes(n)) known.push(n);
+      if (!pt.names.includes(n)) pt.names.push(n);
+      changed(); renderEval();
+    });
+    chips.append(nn);
+    sec3.append(row, chips);
+  });
+  sec3.append(addButton("加一条", () => { const last = e.points[e.points.length - 1]; e.points.push({ sign: "+", text: "", names: last ? [...last.names] : [] }); changed(); renderEval(); }));
+
+  const sec4 = section("11 最终结论（打算如何继续）", "", box);
+  sec4.append(big("最终结论", "end"));
+  const sec5 = section("12 初定", "下一轮照抄这里", box);
+  const r5 = el("div", "evrow");
+  EV_MOLD.forEach(([k, l]) => r5.append(small(l, k, e.mold, k === "no" || k === "spec" || k === "weight" ? "wide" : "")));
+  sec5.append(r5);
+  showEval();
+}
+function showEval() {
+  const d = document.getElementById("evDoc"), e = evCur();
+  d.textContent = e ? evText(e) : "";
+  d.style.whiteSpace = "pre-wrap";
+}
+document.getElementById("tabEval").addEventListener("click", () => tab("eval"));
+document.getElementById("evIn").addEventListener("change", async ev => {
+  const files = [...ev.target.files]; if (!files.length) return;
+  const done = [], bad = [];
+  for (const f of files) {
+    let r; try { r = evParse(await evReadFile(f), f.name); } catch (err) { bad.push(f.name + "：" + err.message); continue; }
+    if (!r.ok) { bad.push(f.name); continue; }
+    EV().list.push(r.e); EV().cur = r.e.id; done.push(f.name + (r.missed.length ? "（没认出的行：" + r.missed.join(" / ") + "）" : ""));
+  }
+  ev.target.value = "";
+  changed(); renderEval();
+  alert((done.length ? "已导入：\n" + done.join("\n") : "") + (bad.length ? "\n\n不像评估单（找不到 1）…10）），没导入：\n" + bad.join("\n") : ""));
+});
+document.getElementById("evCopy").addEventListener("click", async () => {
+  const e = evCur(); if (!e) { toast("先选或新建一张评估单"); return; }
+  save(); toast(await copyText(evText(e)) ? "已复制，可以粘贴了" : "复制失败");
+});
+document.getElementById("evTxt").addEventListener("click", () => {
+  const e = evCur(); if (!e) { toast("先选或新建一张评估单"); return; }
+  save();
+  // Windows line ends + a BOM, so Notepad and Word open the Chinese correctly
+  const blob = new Blob(["﻿" + evText(e).replace(/\n/g, "\r\n") + "\r\n"], { type: "text/plain;charset=utf-8" });
+  const a = el("a"); a.href = URL.createObjectURL(blob); a.download = evFile(e); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+});
+
 // ---------- tabs and buttons ----------
 function tab(name) {
   document.body.dataset.tab = name;
   try { localStorage.setItem("journal-tab", name); } catch (e) {}
   if (name === "todo") renderTodo();
+  if (name === "eval") renderEval();
 }
 document.getElementById("tabJournal").addEventListener("click", () => { tab("journal"); render(); });
 document.getElementById("tabTodo").addEventListener("click", () => tab("todo"));
