@@ -314,6 +314,10 @@ const T = () => mmdd(DAY);
 // ---------- the fixed lines: text, {d} = journal date, {w} = weekly date, {f: box}, {c: automatic} ----------
 const DAILY = [
   ["*组内日常清单表：", { d: 1 }, "当天接收", { c: "tdIn" }, "，当天完成", { c: "tdDone" }, "，未结", { c: "tdOpen" }, "，传递：", { c: "tdSent" }],
+  // the big boss's own list (01间接上级), counted apart (owner, 2026-11-25); only for people who have items on it.
+  // WORDING NOT FINAL: the owner will give it
+  Object.assign(["*大老板日常清单表：", { d: 1 }, "当天接收", { c: "tdBIn" }, "，当天完成", { c: "tdBDone" }, "，未结", { c: "tdBOpen" }],
+    { auto: true, show: () => TD().items.some(x => sheetOf(x) === "indirect") }),
   ["*接单/出货系统更新：", { d: 1 }, { f: "d2" }],
   ["*在手需下样还未下样款数：", { d: 1 }, { f: "d3" }],
   ["*客户投诉：", { d: 1 }, "/", { f: "d4n" }, "条, 知会QC/QA：", { f: "d4q" }, "条；阿文确认收到：", { f: "d4c" }, "条，今入持续关注区登记客诉：", { c: "newComplaints" }, "条"],
@@ -617,7 +621,7 @@ function genLines() {
   HOUR_LABELS.forEach((label, i) => { const es = S.entries.filter(e => e.cat === i), n = noteOf(es); add("@" + label + (sumOf(es) || "0h") + (n ? "（" + n + "）" : ""), "", false, "h:" + label); });
   add("@总计" + hoursTotal(), S.entries.length ? "" : "今日工时还没填", false, "h:total");
   sec = "daily"; add("▲每日回顾：", "", false, "daily:head");
-  DAILY.forEach(sp => { const r = specText(sp); add(r.t, r.bad, false, "d:" + sp[0]); });
+  DAILY.filter(sp => !sp.show || sp.show()).forEach(sp => { const r = specText(sp); add(r.t, r.bad, false, "d:" + sp[0]); });
   sec = "remind"; add("▲提醒：本周第" + isoWeek(DAY) + "周", "", false, "remind:head");
   items(S.remind, false);
   sec = "focus"; add("▲持续关注(客户工厂投诉/欠包装/测试未过/进度核对/船期预警/品质难点/会议/其他等跟踪)：", "", false, "focus:head");
@@ -1051,7 +1055,8 @@ function renderForm() {
 
   const daily = section("今天的数字", "每天早上会清空，灰色字是上次写的。");
   const auto = el("div", "fout"); auto.append("组内日常清单表（从日常清单自动来）→ ", calc(() => specText(DAILY[0]).t)); daily.append(auto);
-  DAILY.slice(1).forEach(sp => specFields(daily, sp));
+  if (DAILY[1].show()) { const b = el("div", "fout"); b.append("大老板的清单（从日常清单自动来）→ ", calc(() => specText(DAILY[1]).t)); daily.append(b); }
+  DAILY.slice(1).filter(sp => !sp.auto).forEach(sp => specFields(daily, sp));
 
   itemList(section("持续关注", "客诉、欠包装、测试未过、进度核对、船期预警、品质、会议等要跟踪的事。每条都要有计划日期（晚于今天）；今天改过的自动变 +。每条下面：入日志日期 → 计划日期。"), S.focus, true);
   clientsSection();
@@ -1429,8 +1434,10 @@ function duty(x) {
   return p;
 }
 // numbers for the journal's 组内日常清单表 line
+// tdIn/tdDone/tdOpen = 01直接上级 (the group list); tdBIn/tdBDone/tdBOpen = 01间接上级 (the big boss's list)
 function todoCount(k) {
-  const it = TD().items.filter(x => !isF(x));
+  const boss = /^tdB/.test(k); k = k.replace(/^tdB/, "td");
+  const it = TD().items.filter(x => sheetOf(x) === (boss ? "indirect" : "direct"));
   if (k === "tdIn") return it.filter(x => x.got === today()).length;
   if (k === "tdDone") return it.filter(x => x.xDate === today()).length;
   if (k === "tdOpen") return it.filter(x => status(x) !== "OK").length;
@@ -1555,7 +1562,8 @@ function renderCols() {
 }
 function showCounts() {
   const c = document.getElementById("todoCounts");
-  if (c) c.textContent = `未结 ${todoCount("tdOpen")} · 今天收到 ${todoCount("tdIn")} · 今天完成 ${todoCount("tdDone")} · 传递：${todoCount("tdSent")}`;
+  if (c) c.textContent = `直接上级：未结 ${todoCount("tdOpen")} · 今天收到 ${todoCount("tdIn")} · 今天完成 ${todoCount("tdDone")}` +
+    (DAILY[1].show() ? `　大老板：未结 ${todoCount("tdBOpen")} · 今天收到 ${todoCount("tdBIn")} · 今天完成 ${todoCount("tdBDone")}` : "") + ` · 传递：${todoCount("tdSent")}`;
 }
 // open items per list per day, for the 未完成 rows of 02新增统计
 function logOpen() {
