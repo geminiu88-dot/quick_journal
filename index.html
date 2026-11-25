@@ -1074,54 +1074,61 @@ function parseItem(t, withCat) {
 function parseJournal(raw) {
   const s = blank(), missed = [];
   let sec = "", client = null, pl = null, read = 0;
+  // a line it can't read becomes one of your own lines (S.extra), under the last line it did read (owner, 2026-11-25)
+  s.extra = [];
+  let anchor = "h:total", asec = "hours", chain = null;
+  const SEC = { daily: "daily", remind: "remind", focus: "focus", weekly: "weekly", clients: "c1", c1none: "c1none", c2: "c2" };
+  const seen = (key, sc) => { anchor = key; asec = sc || SEC[sec] || "hours"; chain = null; };
+  let raw0 = "";
+  const miss = () => { missed.push(raw0.trim()); const x = { id: newId(), after: chain ? "x:" + chain : anchor, sec: asec, text: raw0 }; s.extra.push(x); chain = x.id; };
   const lines = raw.split(/\r?\n/).map(l => l.replace(/\s+$/, "")).filter(l => l.trim());
   for (let t of lines) {
-    t = t.trim();
+    raw0 = t; t = t.trim();
     if (/^(规则|备忘|●备忘)|^——/.test(t) || /^●\s*备忘/.test(t)) { if (/规则/.test(t)) break; sec = "skip"; continue; }
     if (/^-{5,}/.test(t)) continue;
     if (/^\d*\s*@/.test(t)) {
       const rest = t.replace(/^\d*\s*@\s*/, "");
-      if (rest.startsWith("总计")) { read++; continue; }
+      if (rest.startsWith("总计")) { read++; seen("h:total", "hours"); continue; }
       const k = HOUR_LABELS.findIndex(l => rest.startsWith(l));
       const m = k >= 0 && rest.slice(HOUR_LABELS[k].length).match(/^\s*([^（(]*?)\s*(?:[（(](.*)[）)])?\s*$/);
       if (m && /^[1-5]\d[+-]?$/.test(m[1].trim())) m[1] = m[1].trim().replace(/^(\d+)/, "$1m");   // "30" = 30 min (journals without 0h)
-      if (m && parseHours(m[1])) { s.hours[k].h = tidyHours(m[1]); s.hours[k].note = (m[2] || "").trim(); read++; } else missed.push(t);
+      if (m && parseHours(m[1])) { s.hours[k].h = tidyHours(m[1]); s.hours[k].note = (m[2] || "").trim(); read++; seen("h:" + HOUR_LABELS[k], "hours"); } else miss();
       continue;
     }
-    if (/^▲\s*每日回顾/.test(t)) { sec = "daily"; read++; continue; }
-    if (/^▲\s*提醒/.test(t)) { sec = "remind"; read++; continue; }
-    if (/^▲\s*持续关注/.test(t)) { sec = "focus"; read++; continue; }
+    if (/^▲\s*每日回顾/.test(t)) { sec = "daily"; read++; seen("daily:head"); continue; }
+    if (/^▲\s*提醒/.test(t)) { sec = "remind"; read++; seen("remind:head"); continue; }
+    if (/^▲\s*持续关注/.test(t)) { sec = "focus"; read++; seen("focus:head"); continue; }
     if (/^●●\s*每周回顾/.test(t)) {
-      sec = "weekly"; read++;
+      sec = "weekly"; read++; seen("weekly:head");
       const m = t.match(/(\d{4})\s*更新/); const d = m && mmddToDate(m[1], DAY); if (d) s.weekDate = iso(d);
       continue;
     }
-    if (/^●\s*C1\s*有单老客/.test(t)) { sec = "clients"; read++; continue; }
-    if (/^●\s*C1\s*无单老客/.test(t)) { sec = "c1none"; read++; continue; }
-    if (/^●\s*C2\s*目标客/.test(t)) { sec = "c2"; read++; continue; }
+    if (/^●\s*C1\s*有单老客/.test(t)) { sec = "clients"; read++; seen("c1:head"); continue; }
+    if (/^●\s*C1\s*无单老客/.test(t)) { sec = "c1none"; read++; seen("c1none:head"); continue; }
+    if (/^●\s*C2\s*目标客/.test(t)) { sec = "c2"; read++; seen("c2:head"); continue; }
     if (sec === "skip") continue;
     if (sec === "daily" || sec === "weekly") {
       t = t.replace(NOTE_RE, "");
       const spec = (sec === "daily" ? DAILY : WEEKLY).find(sp => specRe(sp).test(t));
-      if (!spec) { missed.push(t); continue; }
+      if (!spec) { miss(); continue; }
       const vals = t.match(specRe(spec)).slice(1);
       spec.filter(p => p.f).forEach((p, i) => { s.f[p.f] = (vals[i] || "").trim(); });
-      read++; continue;
+      read++; seen((sec === "daily" ? "d:" : "w:") + spec[0]); continue;
     }
     if (/^[+\-－–—]/.test(t)) {
       const x = parseItem(t, sec === "focus");
       const list = sec === "remind" ? s.remind : sec === "focus" ? s.focus : sec === "c1none" ? s.c1none : sec === "c2" ? s.c2 : pl && pl.items;
-      if (x && list) { list.push(x); read++; } else missed.push(t);
+      if (x && list) { x.id = newId(); list.push(x); read++; seen("i:" + x.id); } else miss();
       continue;
     }
     if (sec === "clients") {
       const h = t.match(/^([A-Za-z0-9]+)\s*(前后|前|后)\s*(.*)$/);
-      if (h) { client = { name: h[1], role: h[2], lines: [] }; s.clients.push(client); pl = { product: h[3], qty: "", items: [] }; client.lines.push(pl); read++; continue; }
-      if (client && pl && !pl.qty && !pl.items.length) { pl.qty = t; read++; continue; }
-      if (client && pl && QTY_RE.test(t)) { pl.qty += "；" + t; read++; continue; }
-      if (client) { pl = { product: t, qty: "", items: [] }; client.lines.push(pl); read++; continue; }
+      if (h) { client = { name: h[1], role: h[2], lines: [] }; s.clients.push(client); pl = { id: newId(), product: h[3], qty: "", items: [] }; client.lines.push(pl); read++; seen("cl:" + pl.id); continue; }
+      if (client && pl && !pl.qty && !pl.items.length) { pl.qty = t; read++; seen("cq:" + pl.id); continue; }
+      if (client && pl && QTY_RE.test(t)) { pl.qty += "；" + t; read++; seen("cq:" + pl.id); continue; }
+      if (client) { pl = { id: newId(), product: t, qty: "", items: [] }; client.lines.push(pl); read++; seen("cl:" + pl.id); continue; }
     }
-    missed.push(t);
+    miss();
   }
   return { s, missed, read };
 }
@@ -1170,12 +1177,12 @@ document.getElementById("impClose").addEventListener("click", () => impDlg.close
 document.getElementById("impCheck").addEventListener("click", () => {
   parsed = parseJournal(impText.value);
   impResult.textContent = "读懂了 " + parsed.read + " 行。" +
-    (parsed.missed.length ? "\n下面 " + parsed.missed.length + " 行没读懂，导入后不会出现，请在文字里改好再检查，或导入后手动加：\n" + parsed.missed.join("\n") : "全部读懂。");
+    (parsed.missed.length ? "\n下面 " + parsed.missed.length + " 行没读懂：导入后照原样放在原来的位置，作为自己加的行（蓝色，可以改或删）：\n" + parsed.missed.join("\n") : "全部读懂。");
   impDo.disabled = parsed.read === 0;
 });
 impDo.addEventListener("click", () => {
   if (!parsed || !confirm("用这份日志替换页面上现在的内容？")) return;
-  const keep = { archive: S.archive, todo: S.todo, evals: S.evals, extra: S.extra }; S = parsed.s; Object.assign(S, keep);
+  const keep = { archive: S.archive, todo: S.todo, evals: S.evals }; S = parsed.s; Object.assign(S, keep);   // own lines: the imported ones
   S.prev = { f: { ...S.f }, hours: S.hours.map(h => ({ ...h })) };
   impDlg.close(); render(); toast("已导入");
 });
