@@ -28,6 +28,11 @@ exact format on the right, made from the form. 「复制日志」 copies that te
 - 「导入现有日志」 reads a pasted journal; tolerant of spaces and half/full-width
   punctuation, lists every line it can't place (no guessing).
 - 「以前的日志」: the text of each day, last 60 days.
+- **Own lines:** every line of the journal text has a grey dot on its left
+  (＋ under the mouse): it adds a line of your own right under it, exactly
+  as typed, kept every day until deleted (click to edit, × to delete). It
+  stays under the line it was added to (lines have stable keys); if that
+  line is gone, at the end of its section. Stored in `S.extra`.
 - The fixed lines (labels, boxes, counts) are the `DAILY` / `WEEKLY` lists at
   the top of the script; the importer reads lines with the same lists.
   Only the values are boxes (numbers side by side, text below); the words

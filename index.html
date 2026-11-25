@@ -42,6 +42,13 @@
   .doc { background: var(--paper); border: 1px solid var(--border); border-radius: 4px; padding: 24px 32px; }
   .line { min-height: 1.75em; white-space: pre-wrap; word-break: break-all; position: relative; }
   .line:hover > .ui { visibility: visible; }
+  /* ＋ = add a line under this one: a small grey dot at the line's bottom-left, always there; it turns into ＋ under the mouse */
+  .line .addline { position: absolute; left: -20px; bottom: -0.55em; width: 16px; height: 16px; line-height: 16px; text-align: center;
+    font-size: 0; cursor: pointer; border-radius: 50%; z-index: 1; }
+  .line .addline::before { content: "•"; font-size: 12px; color: var(--border); }
+  .line .addline:hover::before { content: "＋"; color: var(--ui); font-weight: bold; }
+  .line.extra { color: var(--ui); cursor: text; } .line.extra .x { top: 0; color: var(--muted); }
+  .extrabox { width: 100%; font: inherit; border: 1px solid var(--ui); border-radius: 3px; padding: 1px 4px; }
   [contenteditable] { background: var(--edit); border-bottom: 1px dashed var(--edit-line); outline: none;
     padding: 0 2px; border-radius: 2px; min-width: 1.5em; display: inline-block; }
   [contenteditable]:focus { box-shadow: 0 0 0 2px var(--edit-line); }
@@ -210,7 +217,7 @@
   <div class="jgrid jonly">
     <div id="form"></div>
     <div class="prevwrap">
-      <div class="prevhead"><b>日志文字</b>（自动生成，不用改；按「复制日志」）<span id="badCount"></span></div>
+      <div class="prevhead"><b>日志文字</b>（自动生成；行左边的 ＋ 可以加自己的行，按原样每天保留；按「复制日志」）<span id="badCount"></span></div>
       <div class="doc" id="doc"></div>
     </div>
   </div>
@@ -574,46 +581,105 @@ function tight(t) {
   return t.replace(/[ \t\u3000]+/g, (sp, i, all) => /[A-Za-z0-9]/.test(all[i - 1] || "") && /[A-Za-z0-9]/.test(all[i + sp.length] || "") ? " " : "");
 }
 function genLines() {
-  const L = [], add = (t, bad = "", raw) => L.push({ t: raw ? t : tight(t), bad });
-  const items = (list, withCat) => list.filter(alive).forEach(x => add(itemText(x, withCat), itemBad(x)));
-  HOUR_LABELS.forEach((label, i) => { const es = S.entries.filter(e => e.cat === i), n = noteOf(es); add("@" + label + sumOf(es) + (n ? "（" + n + "）" : "")); });
-  add("@总计" + hoursTotal(), S.entries.length ? "" : "今日工时还没填");
-  add("▲每日回顾：");
-  DAILY.forEach(sp => { const r = specText(sp); add(r.t, r.bad); });
-  add("▲提醒：本周第" + isoWeek(DAY) + "周");
+  // every line gets a key (where it is) and a section, so your own lines (S.extra) can stay under the line they were added to
+  const L = [];
+  let sec = "hours";
+  const add = (t, bad = "", raw, key) => L.push({ t: raw ? t : tight(t), bad, key: key || sec + ":" + L.length, sec });
+  const items = (list, withCat) => list.filter(alive).forEach(x => add(itemText(x, withCat), itemBad(x), false, "i:" + x.id));
+  HOUR_LABELS.forEach((label, i) => { const es = S.entries.filter(e => e.cat === i), n = noteOf(es); add("@" + label + sumOf(es) + (n ? "（" + n + "）" : ""), "", false, "h:" + label); });
+  add("@总计" + hoursTotal(), S.entries.length ? "" : "今日工时还没填", false, "h:total");
+  sec = "daily"; add("▲每日回顾：", "", false, "daily:head");
+  DAILY.forEach(sp => { const r = specText(sp); add(r.t, r.bad, false, "d:" + sp[0]); });
+  sec = "remind"; add("▲提醒：本周第" + isoWeek(DAY) + "周", "", false, "remind:head");
   items(S.remind, false);
-  add("▲持续关注(客户工厂投诉/欠包装/测试未过/进度核对/船期预警/品质难点/会议/其他等跟踪)：");
+  sec = "focus"; add("▲持续关注(客户工厂投诉/欠包装/测试未过/进度核对/船期预警/品质难点/会议/其他等跟踪)：", "", false, "focus:head");
   items(S.focus, true);
-  add(LINE1);
-  add("●●每周回顾：以下统计值每周5更新：" + mmdd(fromIso(S.weekDate)) + "更新");
-  WEEKLY.forEach(sp => { const r = specText(sp); add(r.t, r.bad); });
-  add("●C1有单老客：" + S.clients.length + "客");
+  sec = "weekly"; add(LINE1, "", false, "line1");
+  add("●●每周回顾：以下统计值每周5更新：" + mmdd(fromIso(S.weekDate)) + "更新", "", false, "weekly:head");
+  WEEKLY.forEach(sp => { const r = specText(sp); add(r.t, r.bad, false, "w:" + sp[0]); });
+  sec = "c1"; add("●C1有单老客：" + S.clients.length + "客", "", false, "c1:head");
   S.clients.forEach(c => c.lines.forEach((l, i) => {
     const lonely = isFront(c.role) && /前/.test(c.role) && !l.items.filter(alive).length ? "前道每条产品线至少要一条跟踪事项" : "";
     // the space between 简称+前/后 and the product line stays: it separates the two (as in the template "ABC1前 鞋1")
-    add((i === 0 ? tight(c.name + c.role) + " " : "") + tight(l.product), i === 0 && !c.name ? "客户简称没填" : lonely, true);
-    const q = qtyText(c, l); if (q) add(q);
+    add((i === 0 ? tight(c.name + c.role) + " " : "") + tight(l.product), i === 0 && !c.name ? "客户简称没填" : lonely, true, "cl:" + l.id);
+    const q = qtyText(c, l); if (q) add(q, "", false, "cq:" + l.id);
     items(l.items, false);
   }));
-  add("●C1无单老客/C1新客：" + S.c1none.filter(alive).length + "客");
+  sec = "c1none"; add("●C1无单老客/C1新客：" + S.c1none.filter(alive).length + "客", "", false, "c1none:head");
   items(S.c1none, false);
-  add("●C2目标客：" + S.c2.filter(alive).length + "客");
+  sec = "c2"; add("●C2目标客：" + S.c2.filter(alive).length + "客", "", false, "c2:head");
   items(S.c2, false);
-  add(LINE2);
-  add("●备忘：");
-  add("*日常清单表：若有新的记录生成或有记录完成了，需当天传递；");
-  add("*日常清单表：若有未完成的记录，无论有无更新，每周一传递；");
-  return L;
+  sec = "memo"; add(LINE2, "", false, "line2");
+  add("●备忘：", "", false, "memo:head");
+  add("*日常清单表：若有新的记录生成或有记录完成了，需当天传递；", "", false, "memo:1");
+  add("*日常清单表：若有未完成的记录，无论有无更新，每周一传递；", "", false, "memo:2");
+  return withExtra(L);
+}
+// your own lines, exactly as typed, each under the line it was added to; if that line is gone (an item closed),
+// at the end of the same section. A line added under one of your own lines follows it.
+function withExtra(L) {
+  const ex = S.extra || []; if (!ex.length) return L;
+  const keys = new Set([...L.map(l => l.key), ...ex.map(x => "x:" + x.id)]), end = {};
+  L.forEach(l => { end[l.sec] = l.key; });
+  const where = x => keys.has(x.after) ? x.after : end[x.sec] || L[L.length - 1].key;
+  const out = [], emit = k => ex.filter(x => where(x) === k).forEach(x => { out.push({ t: x.text, bad: "", key: "x:" + x.id, sec: x.sec, extra: x }); emit("x:" + x.id); });
+  L.forEach(l => { out.push(l); emit(l.key); });
+  return out;
+}
+// stable ids for items, clients and product lines (the place keys of their lines)
+let idSeq = 0;
+const newId = () => Date.now().toString(36) + (idSeq++).toString(36);
+function ensureIds() {
+  const all = [...S.remind, ...S.focus, ...S.c1none, ...S.c2, ...S.clients.flatMap(c => [c, ...c.lines, ...c.lines.flatMap(l => l.items)])];
+  all.forEach(x => { if (!x.id) x.id = newId(); });
 }
 function journalText() { return genLines().map(l => l.t).join("\r\n"); }
 function renderPreview() {
+  ensureIds();
   doc.innerHTML = "";
   const lines = genLines();
-  lines.forEach(l => { const d = el("div", "line" + (l.bad ? " badline" : ""), l.t || " "); if (l.bad) d.title = l.bad; doc.append(d); });
+  lines.forEach(l => {
+    const d = el("div", "line" + (l.bad ? " badline" : "") + (l.extra ? " extra" : ""), l.t || " "); if (l.bad) d.title = l.bad;
+    const plus = el("span", "addline", "＋"); plus.title = "在这行下面加一行自己的内容（每天都保留，按原样）";
+    plus.addEventListener("click", ev => { ev.stopPropagation(); editExtra(d, null, l); });
+    d.append(plus);
+    if (l.extra) {
+      d.title = "自己加的行：点一下修改";
+      d.addEventListener("click", () => editExtra(d, l.extra, l));
+      d.append(xBtn("删掉这行", ev => { ev.stopPropagation(); dropExtra(l.extra); }));
+    }
+    doc.append(d);
+  });
   const n = lines.filter(l => l.bad).length;
   const c = document.getElementById("badCount");
   c.textContent = n ? "　" + n + " 行还要处理（红色，鼠标放上去看原因）" : "　全部填好了";
   c.classList.toggle("bad", n > 0);
+}
+// a box in the preview: Enter saves, Esc cancels, empty = delete
+function editExtra(lineDiv, x, l) {
+  const box = el("input", "extrabox"); box.value = x ? x.text : ""; box.placeholder = "自己加的一行，回车保存（空着回车 = 删掉）";
+  const done = keep => {
+    if (box.dataset.done) return; box.dataset.done = "1";
+    if (keep) {
+      const t = box.value;
+      if (x) { if (t.trim()) x.text = t; else return dropExtra(x); }
+      else if (t.trim()) {   // right under the line it was added to: lines already there move below the new one
+        const n = { id: newId(), after: l.key, sec: l.sec, text: t };
+        (S.extra ||= []).forEach(y => { if (y.after === l.key) y.after = "x:" + n.id; });
+        S.extra.push(n);
+      }
+      changed(); save();
+    } else renderPreview();
+  };
+  box.addEventListener("keydown", ev => { if (ev.key === "Enter") { ev.preventDefault(); done(true); } if (ev.key === "Escape") done(false); });
+  box.addEventListener("blur", () => done(true));
+  if (x) lineDiv.replaceWith(box); else lineDiv.after(box);
+  box.focus();
+}
+function dropExtra(x) {
+  // lines added under this one move up to its place
+  S.extra.forEach(y => { if (y.after === "x:" + x.id) y.after = x.after; });
+  S.extra = S.extra.filter(y => y !== x); changed(); save();
 }
 
 // ---------- the form ----------
@@ -1109,7 +1175,7 @@ document.getElementById("impCheck").addEventListener("click", () => {
 });
 impDo.addEventListener("click", () => {
   if (!parsed || !confirm("用这份日志替换页面上现在的内容？")) return;
-  const keep = { archive: S.archive, todo: S.todo, evals: S.evals }; S = parsed.s; Object.assign(S, keep);
+  const keep = { archive: S.archive, todo: S.todo, evals: S.evals, extra: S.extra }; S = parsed.s; Object.assign(S, keep);
   S.prev = { f: { ...S.f }, hours: S.hours.map(h => ({ ...h })) };
   impDlg.close(); render(); toast("已导入");
 });
