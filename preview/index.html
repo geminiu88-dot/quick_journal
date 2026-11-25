@@ -702,15 +702,15 @@ function editExtra(lineDiv, x, l) {
   if (x) lineDiv.replaceWith(box); else lineDiv.after(box);
   box.focus();
 }
-// 「移」: the next ＋ clicked takes the line (and the own lines under it) to just under that line
+// 「移」: the next ＋ clicked takes this one line to just under that line
 let moving = null;
 function stopMoving() { moving = null; document.body.classList.remove("moving"); }
 document.addEventListener("keydown", ev => { if (ev.key === "Escape" && moving) { stopMoving(); renderPreview(); } });
 function moveExtra(l) {
   const x = moving; stopMoving();
-  const under = new Set(["x:" + x.id]);   // x and the own lines that follow it: can't go under those
-  for (let grew = true; grew;) { grew = false; S.extra.forEach(y => { if (under.has(y.after) && !under.has("x:" + y.id)) { under.add("x:" + y.id); grew = true; } }); }
-  if (under.has(l.key)) { toast("不能放到它自己下面"); renderPreview(); return; }
+  if (l.key === "x:" + x.id) { renderPreview(); return; }
+  // only this line moves: own lines that were under it stay where they are (they take its old place)
+  S.extra.forEach(y => { if (y.after === "x:" + x.id) { y.after = x.after; if (x.before) y.before = x.before; } });
   S.extra.forEach(y => { if (y.after === l.key && y !== x) y.after = "x:" + x.id; });
   x.after = l.key; x.sec = l.sec; delete x.before; changed(); save();
 }
