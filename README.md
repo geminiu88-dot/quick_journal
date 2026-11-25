@@ -83,4 +83,9 @@ exact format on the right, made from the form. 「复制日志」 copies that te
   journal (`S.evals`, in the backup). 「导入txt」 reads old ones (GBK or
   UTF-8, lines found by number); 「下一轮」 starts the next round with 9） =
   this round's 11） and 12） 初定 copied. 「下载txt」 = UTF-8 with BOM, CRLF.
+- **旧ERP书签 tab**: shows `erp.html`, the install page of the old-ERP
+  bookmarks 复制本页 / 粘贴表单 / 填今天 (drag onto the bookmarks bar), with
+  each one's version date. `erp.html` is made by smol_system's
+  `tools/erp_bookmarks/build_install.py ../quick_journal`: never edit it
+  here. This repo is public: no ERP address, client data or names in it.
 - Not done yet: business-year rollover on 31 Oct (rule 10), other teams' formats.
