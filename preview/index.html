@@ -43,9 +43,12 @@
   .doc { background: var(--paper); border: 1px solid var(--border); border-radius: 4px; padding: 24px 32px; }
   .line { min-height: 1.75em; white-space: pre-wrap; word-break: break-all; position: relative; }
   .line:hover > .ui { visibility: visible; }
-  .line .addline { position: absolute; left: -22px; top: 0.6em; font-size: 12px; color: var(--ui); cursor: pointer; visibility: hidden; padding: 0 4px; }
-  .line:hover .addline { visibility: visible; }
-  .line.extra { color: var(--ui); cursor: text; } .line.extra .x { visibility: hidden; top: 0; } .line.extra:hover .x { visibility: visible; }
+  /* ＋ = add a line under this one: a small grey dot at the line's bottom-left, always there; it turns into ＋ under the mouse */
+  .line .addline { position: absolute; left: -20px; bottom: -0.55em; width: 16px; height: 16px; line-height: 16px; text-align: center;
+    font-size: 0; cursor: pointer; border-radius: 50%; z-index: 1; }
+  .line .addline::before { content: "•"; font-size: 12px; color: var(--border); }
+  .line .addline:hover::before { content: "＋"; color: var(--ui); font-weight: bold; }
+  .line.extra { color: var(--ui); cursor: text; } .line.extra .x { top: 0; color: var(--muted); }
   .extrabox { width: 100%; font: inherit; border: 1px solid var(--ui); border-radius: 3px; padding: 1px 4px; }
   [contenteditable] { background: var(--edit); border-bottom: 1px dashed var(--edit-line); outline: none;
     padding: 0 2px; border-radius: 2px; min-width: 1.5em; display: inline-block; }
@@ -661,7 +664,11 @@ function editExtra(lineDiv, x, l) {
     if (keep) {
       const t = box.value;
       if (x) { if (t.trim()) x.text = t; else return dropExtra(x); }
-      else if (t.trim()) (S.extra ||= []).push({ id: newId(), after: l.key, sec: l.sec, text: t });
+      else if (t.trim()) {   // right under the line it was added to: lines already there move below the new one
+        const n = { id: newId(), after: l.key, sec: l.sec, text: t };
+        (S.extra ||= []).forEach(y => { if (y.after === l.key) y.after = "x:" + n.id; });
+        S.extra.push(n);
+      }
       changed(); save();
     } else renderPreview();
   };
