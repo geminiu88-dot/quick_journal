@@ -78,6 +78,8 @@
   #newsList summary { cursor: pointer; }
   #newsList .d { color: var(--muted); margin-right: 8px; font-size: 13px; }
   #newsList pre { white-space: pre-wrap; margin: 4px 0 4px 20px; font: inherit; font-size: 13px; color: var(--muted); }
+  #impClients label.impc { display: block; font-size: 14px; cursor: pointer; }
+  #impClients p { margin: 4px 0; font-size: 13px; color: var(--muted); }
   dialog textarea { width: 100%; height: 50vh; font: inherit; font-size: 14px; background: var(--bg); color: var(--ink); }
   .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--paper);
     padding: 8px 18px; border-radius: 6px; opacity: 0; transition: opacity .2s; pointer-events: none; }
@@ -273,6 +275,7 @@
   <p>把现有的日志文字整篇粘贴进来（规则部分可以不要），按“检查”。</p>
   <textarea id="impText"></textarea>
   <p><button id="impCheck">检查</button> <button id="impDo" disabled>导入</button> <button id="impClose">关闭</button></p>
+  <div id="impClients"></div>
   <pre id="impResult" style="white-space:pre-wrap"></pre>
 </dialog>
 <div class="toast" id="toast"></div>
@@ -1126,8 +1129,9 @@ function parseItem(t, withCat) {
   const plan = (m[3] || "").toUpperCase();
   return { start: m[1] || "", cat, text, plan, edited: "", closed: plan === "X" ? today() : "" };
 }
-function parseJournal(raw) {
-  const s = blank(), missed = [];
+// mark = { line number: true/false } from the client ticks in the import dialog (overrides the 3-capitals rule)
+function parseJournal(raw, mark = {}) {
+  const s = blank(), missed = [], c1 = [];   // c1 = the unmarked lines of the client block, for the ticks
   let sec = "", client = null, pl = null, read = 0;
   // a line it can't read becomes one of your own lines (S.extra), under the last line it did read (owner, 2026-11-25)
   s.extra = [];
@@ -1137,8 +1141,8 @@ function parseJournal(raw) {
   let raw0 = "";
   const miss = () => { missed.push(raw0.trim()); const x = { id: newId(), after: chain ? "x:" + chain : anchor, sec: asec, text: raw0 }; s.extra.push(x); chain = x.id; };
   const lines = raw.split(/\r?\n/).map(l => l.replace(/\s+$/, "")).filter(l => l.trim());
-  for (let t of lines) {
-    raw0 = t; t = t.trim();
+  for (const [n, line] of lines.entries()) {
+    let t = line; raw0 = t; t = t.trim();
     if (/^(规则|备忘|●备忘)|^——/.test(t) || /^●\s*备忘/.test(t)) { if (/规则/.test(t)) break; sec = "skip"; continue; }
     if (/^-{5,}/.test(t)) continue;
     if (/^\d*\s*@/.test(t)) {
@@ -1184,7 +1188,9 @@ function parseJournal(raw) {
         if (client && pl && QTY_OWN.test(tight(t))) { pl.qty = (pl.qty ? pl.qty + "；" : "") + t; read++; seen("cq:" + pl.id); continue; }
         miss(); continue;
       }
-      if (/[A-Z]{3}/.test(t)) {
+      const isClient = n in mark ? mark[n] : /[A-Z]{3}/.test(t);
+      c1.push({ n, t, isClient });
+      if (isClient) {
         // 简称 = everything before 前/后 ("ABC1/ABCB前 鞋1", "ABC1-ABCB 前", "ABC:前 鞋2"); no 前/后: the first word
         const r = t.match(/^(.+?)\s*(前后|前|后)\s*(.*)$/), w = t.match(/^(\S+)\s*(.*)$/);
         const [name, role, product] = r ? [r[1], r[2], r[3]] : [w[1], "", w[2]];
@@ -1195,7 +1201,7 @@ function parseJournal(raw) {
     }
     miss();
   }
-  return { s, missed, read };
+  return { s, missed, read, c1 };
 }
 
 // ---------- toolbar ----------
@@ -1258,15 +1264,31 @@ document.getElementById("news").addEventListener("click", async () => {
 const impDlg = document.getElementById("impDlg"), impText = document.getElementById("impText"),
   impResult = document.getElementById("impResult"), impDo = document.getElementById("impDo");
 let parsed = null;
-document.getElementById("imp").addEventListener("click", () => { impResult.textContent = ""; impDo.disabled = true; impDlg.showModal(); });
+document.getElementById("imp").addEventListener("click", () => { impResult.textContent = ""; document.getElementById("impClients").innerHTML = ""; impMark = {}; impDo.disabled = true; impDlg.showModal(); });
 document.getElementById("impClose").addEventListener("click", () => impDlg.close());
-document.getElementById("impCheck").addEventListener("click", () => {
-  parsed = parseJournal(impText.value);
+// the client block's unmarked lines with a tick each: ticked = a client line (简称 before 前/后), else a product line
+let impMark = {};
+impText.addEventListener("input", () => { impMark = {}; impDo.disabled = true; });
+function showImpClients() {
+  const box = document.getElementById("impClients"); box.innerHTML = "";
+  if (!parsed.c1.length) return;
+  box.append(el("p", "", "C1有单老客：勾上的是客户行（简称写在前/后前面，如 ABC1前 鞋1），没勾的是产品线。读错了就点一下改。"));
+  parsed.c1.forEach(r => {
+    const lab = el("label", "impc"), cb = el("input"); cb.type = "checkbox"; cb.checked = r.isClient;
+    lab.title = "勾上 = 这一行是一个客户（简称 + 前/后 + 产品线）；不勾 = 上面那个客户的另一条产品线";
+    cb.addEventListener("change", () => { impMark[r.n] = cb.checked; check(); });
+    lab.append(cb, " " + r.t); box.append(lab);
+  });
+}
+document.getElementById("impCheck").addEventListener("click", () => check());
+function check() {
+  parsed = parseJournal(impText.value, impMark);
+  showImpClients();
   const cl = parsed.s.clients.map(c => c.name + (c.role ? "（" + c.role + "）" : ""));
   impResult.textContent = "读懂了 " + parsed.read + " 行。" + (cl.length ? "C1有单老客 " + cl.length + " 个：" + cl.join("、") + "。" : "C1有单老客：一个也没读到。") +
     (parsed.missed.length ? "\n下面 " + parsed.missed.length + " 行没读懂：导入后照原样放在原来的位置，作为自己加的行（蓝色，可以改或删）：\n" + parsed.missed.join("\n") : "全部读懂。");
   impDo.disabled = parsed.read === 0;
-});
+}
 impDo.addEventListener("click", () => {
   if (!parsed || !confirm("用这份日志替换页面上现在的内容？")) return;
   const keep = { archive: S.archive, todo: S.todo, evals: S.evals }; S = parsed.s; Object.assign(S, keep);   // own lines: the imported ones
