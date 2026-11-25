@@ -1172,13 +1172,21 @@ function parseJournal(raw) {
       continue;
     }
     if (sec === "clients") {
-      // client header: 简称 (letters/digits, also two names like "ABC1/ABCB") + 前/后 + product line
-      const h = t.match(/^([A-Za-z0-9][A-Za-z0-9/／&_-]*)\s*(前后|前|后)\s*(.*)$/);
-      if (h) { client = { name: h[1], role: h[2], lines: [] }; s.clients.push(client); pl = { id: newId(), product: h[3], qty: "", items: [] }; client.lines.push(pl); read++; seen("cl:" + pl.id); continue; }
-      // a quantity line is read only when it is written exactly as the page writes it ("226单5000双，估4000双");
-      // anything else ("鞋1：226/S27:单5000双") is kept as typed, as an own line
-      if (client && pl && QTY_OWN.test(tight(t))) { pl.qty = (pl.qty ? pl.qty + "；" : "") + t; read++; seen("cq:" + pl.id); continue; }
-      if (client && t.length <= 12 && !/\d{3}|[：:]/.test(t)) { pl = { id: newId(), product: t, qty: "", items: [] }; client.lines.push(pl); read++; seen("cl:" + pl.id); continue; }
+      // the client block is the only part without markers (owner, 2026-11-25):
+      // a line with 双 = quantity line; a line with 3 capitals in a row = client header; any other short line = product line
+      if (/\d\s*双/.test(t)) {
+        // read only when written exactly as the page writes it ("226单5000双，估4000双"); other wordings stay as typed
+        if (client && pl && QTY_OWN.test(tight(t))) { pl.qty = (pl.qty ? pl.qty + "；" : "") + t; read++; seen("cq:" + pl.id); continue; }
+        miss(); continue;
+      }
+      if (/[A-Z]{3}/.test(t)) {
+        // 简称 = everything before 前/后 ("ABC1/ABCB前 鞋1", "ABC1-ABCB 前", "ABC:前 鞋2"); no 前/后: the first word
+        const r = t.match(/^(.+?)\s*(前后|前|后)\s*(.*)$/), w = t.match(/^(\S+)\s*(.*)$/);
+        const [name, role, product] = r ? [r[1], r[2], r[3]] : [w[1], "", w[2]];
+        client = { name: name.trim(), role, lines: [] }; s.clients.push(client);
+        pl = { id: newId(), product: product.trim(), qty: "", items: [] }; client.lines.push(pl); read++; seen("cl:" + pl.id); continue;
+      }
+      if (client && t.length <= 20) { pl = { id: newId(), product: t, qty: "", items: [] }; client.lines.push(pl); read++; seen("cl:" + pl.id); continue; }
     }
     miss();
   }
@@ -1249,7 +1257,8 @@ document.getElementById("imp").addEventListener("click", () => { impResult.textC
 document.getElementById("impClose").addEventListener("click", () => impDlg.close());
 document.getElementById("impCheck").addEventListener("click", () => {
   parsed = parseJournal(impText.value);
-  impResult.textContent = "读懂了 " + parsed.read + " 行。" +
+  const cl = parsed.s.clients.map(c => c.name + (c.role ? "（" + c.role + "）" : ""));
+  impResult.textContent = "读懂了 " + parsed.read + " 行。" + (cl.length ? "C1有单老客 " + cl.length + " 个：" + cl.join("、") + "。" : "C1有单老客：一个也没读到。") +
     (parsed.missed.length ? "\n下面 " + parsed.missed.length + " 行没读懂：导入后照原样放在原来的位置，作为自己加的行（蓝色，可以改或删）：\n" + parsed.missed.join("\n") : "全部读懂。");
   impDo.disabled = parsed.read === 0;
 });
