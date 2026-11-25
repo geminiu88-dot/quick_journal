@@ -492,15 +492,18 @@ function migrateHours() {
   if (S.entries) return;
   S.entries = S.hours.flatMap((h, i) => { const p = parseHours(h.h); return p && p.min ? [{ cat: i, text: h.note || "", min: p.min, sign: p.sign }] : []; });
 }
+// in the journal: no "0h" (owner, 2026-11-25): 0 min = nothing, 30 min = "30", 90 min = "1h30"
+function fmtOut(min, sign) { const h = Math.floor(min / 60), m = min % 60; return min ? (h ? h + "h" + (m ? String(m).padStart(2, "0") : "") : String(m)) + (sign || "") : ""; }
 function sumOf(es) {
   const min = es.reduce((a, e) => a + (+e.min || 0), 0);
-  return fmtHours(min, es.some(e => e.sign === "+") ? "+" : es.some(e => e.sign === "-") ? "-" : "");
+  return fmtOut(min, es.some(e => e.sign === "+") ? "+" : es.some(e => e.sign === "-") ? "-" : "");
 }
 // one entry: just its text; several: each with its own time (rule 1)
 function noteOf(es) {
   const named = es.filter(e => e.text.trim());
   if (!named.length) return "";
-  return es.length === 1 ? named[0].text.trim() : named.map(e => e.text.trim() + fmtHours(+e.min || 0, e.sign)).join("，");
+  return es.length === 1 ? named[0].text.trim() : named.map(e => { const t = e.text.trim(), h = fmtOut(+e.min || 0, e.sign);   // "寄样给pep 4h30", not "pep4h30"
+    return t + (h && /[A-Za-z0-9]$/.test(t) ? " " : "") + h; }).join("，");
 }
 function hoursTotal() { return sumOf(S.entries); }
 
@@ -528,21 +531,25 @@ function migrateClients() {
       if (QTY_RE.test(l.product) && !l.orders) { const up = c.lines[i - 1]; up.qty = (up.qty || "") + "；" + l.product + (l.qty ? "；" + l.qty : ""); up.items.push(...l.items); c.lines.splice(i, 1); }
     }
     c.lines.forEach(migrateQty);
+    // 2026-11-25: quantities are optional per product line (l.stats); lines that have numbers keep them on
+    c.lines.forEach(l => { if (l.stats == null) l.stats = [...Object.values(l.orders || {}), l.est, l.unshipped].some(v => v !== "" && v != null); });
   });
 }
 const curYear = () => +bizYear(DAY);
+// role is free text (owner, 2026-11-25): 前/前后/后 or anything else. 前 side = order numbers + 估, 后 side = 未出;
+// a role with neither word gets both. Every number is optional: an empty box is left out, no boxes = no quantity line.
+const isFront = r => !/后/.test(r || "") || /前/.test(r || "");
+const isBack = r => /后/.test(r || "") || !/前/.test(r || "");
 function qtyText(c, l) {
-  const y = curYear(), o = l.orders || {}, n = v => (v === "" || v == null ? "0" : v);
-  if (c.role === "后") return y + "未出" + n(l.unshipped) + "双";
-  let t = (y - 1) + "单" + n(o[y - 1]) + "双；" + y + "单" + n(o[y]) + "双";
-  if (c.role === "前后") t += "，未出" + n(l.unshipped) + "双";
-  if (o[y + 1]) t += "，" + (y + 1) + "单" + o[y + 1] + "双";
-  return t + "，估" + n(l.est) + "双";
-}
-function qtyBad(c, l) {
-  if (c.role !== "前" && (l.unshipped ?? "") === "") return "未出没填";
-  if (c.role !== "后" && (l.est ?? "") === "") return "估没填";
-  return "";
+  const y = curYear(), o = l.orders || {}, has = v => v !== "" && v != null, r = c.role;
+  if (l.stats === false) return "";
+  if (!isFront(r)) return has(l.unshipped) ? y + "未出" + l.unshipped + "双" : "";
+  const years = [y - 1, y].filter(k => has(o[k])).map(k => k + "单" + o[k] + "双").join("；");
+  const rest = [];
+  if (isBack(r) && has(l.unshipped)) rest.push("未出" + l.unshipped + "双");
+  if (has(o[y + 1])) rest.push((y + 1) + "单" + o[y + 1] + "双");
+  if (has(l.est)) rest.push("估" + l.est + "双");
+  return [years, ...rest].filter(Boolean).join("，");
 }
 
 // ---------- the journal text: one {t, bad} per line; bad = why the line still needs work ----------
@@ -561,10 +568,15 @@ function specText(spec) {
   }).join("");
   return { t, bad };
 }
+// rule 9: no needless spaces. A space stays only between two letters/digits (e.g. "1120 C1日志"), where it separates words.
+function tight(t) {
+  if (/^[-—─=]{5,}/.test(t)) return t;
+  return t.replace(/[ \t\u3000]+/g, (sp, i, all) => /[A-Za-z0-9]/.test(all[i - 1] || "") && /[A-Za-z0-9]/.test(all[i + sp.length] || "") ? " " : "");
+}
 function genLines() {
-  const L = [], add = (t, bad = "") => L.push({ t, bad });
+  const L = [], add = (t, bad = "", raw) => L.push({ t: raw ? t : tight(t), bad });
   const items = (list, withCat) => list.filter(alive).forEach(x => add(itemText(x, withCat), itemBad(x)));
-  HOUR_LABELS.forEach((label, i) => { const es = S.entries.filter(e => e.cat === i), n = noteOf(es); add("@" + label + " " + sumOf(es) + (n ? "（" + n + "）" : "")); });
+  HOUR_LABELS.forEach((label, i) => { const es = S.entries.filter(e => e.cat === i), n = noteOf(es); add("@" + label + sumOf(es) + (n ? "（" + n + "）" : "")); });
   add("@总计" + hoursTotal(), S.entries.length ? "" : "今日工时还没填");
   add("▲每日回顾：");
   DAILY.forEach(sp => { const r = specText(sp); add(r.t, r.bad); });
@@ -577,9 +589,10 @@ function genLines() {
   WEEKLY.forEach(sp => { const r = specText(sp); add(r.t, r.bad); });
   add("●C1有单老客：" + S.clients.length + "客");
   S.clients.forEach(c => c.lines.forEach((l, i) => {
-    const lonely = c.role !== "后" && !l.items.filter(alive).length ? "前道每条产品线至少要一条跟踪事项" : "";
-    add((i === 0 ? c.name + c.role + " " : "") + l.product, i === 0 && !c.name ? "客户简称没填" : lonely);
-    add(qtyText(c, l), qtyBad(c, l));
+    const lonely = isFront(c.role) && /前/.test(c.role) && !l.items.filter(alive).length ? "前道每条产品线至少要一条跟踪事项" : "";
+    // the space between 简称+前/后 and the product line stays: it separates the two (as in the template "ABC1前 鞋1")
+    add((i === 0 ? tight(c.name + c.role) + " " : "") + tight(l.product), i === 0 && !c.name ? "客户简称没填" : lonely, true);
+    const q = qtyText(c, l); if (q) add(q);
     items(l.items, false);
   }));
   add("●C1无单老客/C1新客：" + S.c1none.filter(alive).length + "客");
@@ -659,7 +672,7 @@ const FIELD_HELP = {
   d3: ["手上要下样、还没下样的款", "款数：哪个客户几款，打算怎么办 + 计划日期"],
   d4n: ["投诉条数", "", "n"], d4q: ["知会QC/QA", "", "n"], d4c: ["阿文确认收到", "", "n"],
   w1n: ["投诉数", "", "n"], w1t: ["哪个厂投诉什么", "没有就空着", "o"],
-  w2n: ["推了几个客", "", "n"], w2t: ["客户/款数"], w2p: ["下周计划"],
+  w2n: ["推了几个客", "", "n"], w2t: ["客户/款数", "0客就空着", "o"], w2p: ["下周计划"],
   w3n: ["客数", "", "n"], w3s: ["系统更新自评", "", "n"], w3a: ["激活"], w3b: ["新入系统"],
   w4a: ["C1（系统里）", "", "n"], w4b: ["C2（系统里）", "", "n"], w4t: ["校对时间", "", "n"],
   w5: ["未结账务"], w6n: ["款数", "", "n"], w7n: ["款数", "", "n"],
@@ -803,7 +816,7 @@ function applyClientNumbers(text) {
   const y = 200 + d.year % 100;
   if (y !== curYear()) return { error: `系统页面是 ${d.year} 年度，日志现在是 ${curYear()} 年度：请在客户总表选对年度再复制。` };
   const by = {}; d.clients.forEach(c => { by[c.name] = c; });
-  const res = { filled: [], missing: [], added: [], extra: [] };
+  const res = { filled: [], missing: [], added: [], extra: [], skipped: [] };
   const names = d.clients.flatMap(c => c.lines.map(l => l.product));
   S.clients.forEach(c => {
     const src = by[(c.name || "").trim().toUpperCase()];
@@ -811,11 +824,13 @@ function applyClientNumbers(text) {
     const want = src.lines.filter(l => l.last > 0 || l.ordered > 0);
     const used = new Set();
     want.forEach(w => {
-      // the journal line of this product: same name, else a line not named after a system product yet, else a new one
+      // the journal line of this product (same name, else a line not named after a system product yet);
+      // only lines with 数量 switched on are filled, and no line is added (owner, 2026-11-25)
       let l = c.lines.find(x => x.product === w.product);
-      if (!l) { l = c.lines.find(x => !used.has(x) && !names.includes(x.product)); if (l) l.product = w.product; }
-      if (!l) { l = { product: w.product, qty: "", orders: {}, est: "", unshipped: "", items: [] }; c.lines.push(l); res.added.push(c.name + " " + w.product); }
+      if (!l) { l = c.lines.find(x => !used.has(x) && x.stats !== false && !names.includes(x.product)); if (l) l.product = w.product; }
+      if (!l) { res.added.push(c.name + " " + w.product); return; }
       used.add(l);
+      if (l.stats === false) { res.skipped.push(c.name + " " + l.product); return; }
       const chg = {}, set = (key, old, v, put) => { if ((old ?? "") !== v) chg[key] = old ?? ""; put(v); };
       l.orders ||= {};
       set("o" + (y - 1), l.orders[y - 1], String(w.last), v => { l.orders[y - 1] = v; });
@@ -824,7 +839,7 @@ function applyClientNumbers(text) {
       set("e", l.est, String(w.est), v => { l.est = v; });
       CHG.set(l, chg);
     });
-    c.lines.filter(x => !used.has(x)).forEach(x => res.extra.push(c.name + " " + (x.product || "（没写产品线）")));
+    c.lines.filter(x => !used.has(x) && x.stats !== false).forEach(x => res.extra.push(c.name + " " + (x.product || "（没写产品线）")));
     res.filled.push(c.name);
   });
   return res;
@@ -835,7 +850,8 @@ function pasteClientNumbers() {
     if (r.error) { alert(r.error); return; }
     renderForm(); changed();
     const parts = ["已填 " + r.filled.length + " 个客户" + (r.filled.length ? "：" + r.filled.join("、") : "")];
-    if (r.added.length) parts.push("新加的产品线（前道要各写一条跟踪事项）：" + r.added.join("、"));
+    if (r.added.length) parts.push("系统里有单、日志里没有这条产品线（没加，要的话自己按「＋ 产品线」）：" + r.added.join("、"));
+    if (r.skipped.length) parts.push("不写数量的产品线，跳过：" + r.skipped.join("、"));
     if (r.extra.length) parts.push("系统里今年去年都没单、没动的产品线：" + r.extra.join("、"));
     if (r.missing.length) parts.push("系统页面上没找到：" + r.missing.join("、") + "（简称不一样，或没显示在客户总表里）");
     if (!S.clients.length) parts.push("日志里还没有客户：先按「＋ 客户」写上简称，再粘贴。");
@@ -853,15 +869,17 @@ function clientsSection() {
   paste.addEventListener("click", pasteClientNumbers);
   sys.append(paste, el("span", "hint", "数量不用手抄：在旧系统「客户总表」页面点书签「复制本页」，再回来按这里。"));
   sec.append(sys);
+  const dl = el("datalist"); dl.id = "roleList"; ["前", "前后", "后"].forEach(v => { const o = el("option"); o.value = v; dl.append(o); }); sec.append(dl);
   S.clients.forEach(c => {
     const card = el("div", "ccard");
     const head = el("div", "irow");
     const name = el("input", "short"); name.value = c.name; name.placeholder = "简称";
     name.addEventListener("input", () => { c.name = name.value.trim(); changed(); });
-    const role = el("select"); [["前", "前道"], ["前后", "前后道"], ["后", "后道"]].forEach(([v, t]) => opt(role, v, t)); role.value = c.role;
-    role.addEventListener("change", () => { c.role = role.value; renderForm(); changed(); });
+    const role = el("input", "short"); role.value = c.role || ""; role.placeholder = "前/后/前后…"; role.setAttribute("list", "roleList");
+    role.addEventListener("input", () => { c.role = role.value.trim(); changed(); });
+    role.addEventListener("change", () => renderForm());   // which number boxes show depends on 前/后
     const delC = xBtn("删除客户", () => { if (confirm("删除客户 " + c.name + "？")) { S.clients.splice(S.clients.indexOf(c), 1); renderForm(); changed(); } });
-    name.title = "客户简称（4位）"; role.title = "前道 / 前后道 / 后道";
+    name.title = "客户简称（4位）"; role.title = "写在简称后面的：前 / 前后 / 后，或别的";
     head.append(name, role);
     card.append(head, delC);
     c.lines.forEach((l, i) => {
@@ -872,7 +890,12 @@ function clientsSection() {
       r1.append(prod);
       if (c.lines.length > 1) { const d = xBtn("删除产品线", () => { if (confirm("删除这条产品线？")) { c.lines.splice(i, 1); renderForm(); changed(); } }); pl.append(d); }
       pl.append(r1);
-      // pairs: number boxes, which ones depends on 前/后
+      // pairs: number boxes, which ones depends on 前/后; only when this line has 数量 switched on
+      if (l.stats === false) {
+        const on = el("button", "", "＋ 数量"); on.title = "这条产品线写下单双数（粘贴系统数量也会填它）";
+        on.addEventListener("click", () => { l.stats = true; renderForm(); changed(); });
+        pl.append(on); itemList(pl, l.items, false); card.append(pl); return;
+      }
       const y = curYear(), r2 = el("div", "irow qty");
       const num = (label, get, set, tip, key) => {
         const w = el("label", "num"), b = el("input"); b.inputMode = "numeric"; b.value = get() ?? ""; b.placeholder = "双数";
@@ -883,24 +906,26 @@ function clientsSection() {
         if (was !== undefined) { b.classList.add("chg"); b.title = "从系统填的，原来是：" + (was === "" ? "空" : was); }
         w.append(label, b); r2.append(w); return b;
       };
-      r2.append(el("span", "qlabel", c.role === "后" ? "双数" : "下单双数"));
-      if (c.role !== "后") {
+      r2.append(el("span", "qlabel", isFront(c.role) ? "下单双数" : "双数"));
+      const off = el("button", "", "不写数量"); off.style.fontSize = "12px"; off.title = "这条产品线不写数量（粘贴系统数量也跳过它）";
+      off.addEventListener("click", () => { l.stats = false; renderForm(); changed(); });
+      if (isFront(c.role)) {
         num(`${y - 1}年度`, () => l.orders[y - 1], v => { l.orders[y - 1] = v; }, "上个业务年度下单的双数", "o" + (y - 1));
         num(`${y}年度`, () => l.orders[y], v => { l.orders[y] = v; }, "这个业务年度（11月-10月）到现在下单的双数", "o" + y);
         num(`${y + 1}年度`, () => l.orders[y + 1], v => { l.orders[y + 1] = v; }, "下个业务年度已经下的单，没有就空着", "o" + (y + 1));
       }
-      if (c.role !== "前") num("未出", () => l.unshipped, v => { l.unshipped = v; }, "这个业务年度已下单、还没出货的双数", "u").dataset.req = "1";
-      if (c.role !== "后") num("估", () => l.est, v => { l.est = v; }, "这个业务年度估计还会再下单的双数", "e").dataset.req = "1";
-      pl.append(r2);
+      if (isBack(c.role)) num("未出", () => l.unshipped, v => { l.unshipped = v; }, "这个业务年度已下单、还没出货的双数（可空）", "u");
+      if (isFront(c.role)) num("估", () => l.est, v => { l.est = v; }, "这个业务年度估计还会再下单的双数（可空）", "e");
+      r2.append(off); pl.append(r2);
       if (l.qtyOld) pl.append(el("div", "hint", "以前写的（没读懂，请填进上面的格子）：" + l.qtyOld));
-      const out = el("div", "fout"); out.append("→ ", calc(() => qtyText(c, l))); pl.append(out);
+      const out = el("div", "fout"); out.append("→ ", calc(() => qtyText(c, l) || "（没填数量，不写这一行）")); pl.append(out);
       itemList(pl, l.items, false);
       card.append(pl);
     });
-    card.append(addButton("产品线", () => { c.lines.push({ product: "", qty: "", orders: {}, est: "", unshipped: "", items: [] }); renderForm(); changed(); }));
+    card.append(addButton("产品线", () => { c.lines.push({ product: "", qty: "", orders: {}, est: "", unshipped: "", items: [], stats: true }); renderForm(); changed(); }));
     sec.append(card);
   });
-  sec.append(addButton("客户", () => { S.clients.push({ name: "", role: "前", lines: [{ product: "", qty: "", orders: {}, est: "", unshipped: "", items: [] }] }); renderForm(); changed(); }));
+  sec.append(addButton("客户", () => { S.clients.push({ name: "", role: "前", lines: [{ product: "", qty: "", orders: {}, est: "", unshipped: "", items: [], stats: true }] }); renderForm(); changed(); }));
 }
 
 function renderForm() {
@@ -927,6 +952,12 @@ function renderForm() {
   window.scrollTo(0, y);
 }
 
+// W.. reminders always carry this week's number; a new week also moves their plan to next Monday.
+// (Checked on every render, not only on the first day of a week: that day can be missed, e.g. after 导入现有日志.)
+function syncWeekItems() {
+  const w = "W" + isoWeek(DAY), next = new Date(monday(DAY)); next.setDate(next.getDate() + 7);
+  S.remind.forEach(x => { if (/^W\d+$/.test(x.start) && x.start !== w) { x.start = w; x.plan = mmdd(next); } });
+}
 function render() {
   newDay();
   // drop items closed with X before today (rule 5)
@@ -935,6 +966,7 @@ function render() {
   migrateHours();
   migrateClients();
   migrateFields(S.f); migrateFields(S.prev && S.prev.f);
+  syncWeekItems();
   renderForm();
   save();
 }
@@ -986,6 +1018,7 @@ function parseJournal(raw) {
       if (rest.startsWith("总计")) { read++; continue; }
       const k = HOUR_LABELS.findIndex(l => rest.startsWith(l));
       const m = k >= 0 && rest.slice(HOUR_LABELS[k].length).match(/^\s*([^（(]*?)\s*(?:[（(](.*)[）)])?\s*$/);
+      if (m && /^[1-5]\d[+-]?$/.test(m[1].trim())) m[1] = m[1].trim().replace(/^(\d+)/, "$1m");   // "30" = 30 min (journals without 0h)
       if (m && parseHours(m[1])) { s.hours[k].h = tidyHours(m[1]); s.hours[k].note = (m[2] || "").trim(); read++; } else missed.push(t);
       continue;
     }
