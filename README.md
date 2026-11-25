@@ -32,7 +32,11 @@ exact format on the right, made from the form. 「复制日志」 copies that te
   (＋ under the mouse): it adds a line of your own right under it, exactly
   as typed, kept every day until deleted (click to edit, × to delete). It
   stays under the line it was added to (lines have stable keys); if that
-  line is gone, at the end of its section. Stored in `S.extra`.
+  line is gone, above the line that was below it; if both are gone, at the
+  end of its section in red. 移 puts it under another line. Stored in
+  `S.extra`.
+- **最近更新** (top right): the last 20 commits of this repo, read from the
+  GitHub API on click (needs internet), with a link to the commits page.
 - The fixed lines (labels, boxes, counts) are the `DAILY` / `WEEKLY` lists at
   the top of the script; the importer reads lines with the same lists.
   Only the values are boxes (numbers side by side, text below); the words

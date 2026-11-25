@@ -48,6 +48,8 @@
   .line .addline::before { content: "•"; font-size: 12px; color: var(--border); }
   .line .addline:hover::before { content: "＋"; color: var(--ui); font-weight: bold; }
   .line.extra { color: var(--ui); cursor: text; } .line.extra .x { top: 0; color: var(--muted); }
+  body.moving .line .addline::before { color: var(--ui); font-size: 16px; }
+  .line.movingline { outline: 2px dashed var(--ui); }
   .extrabox { width: 100%; font: inherit; border: 1px solid var(--ui); border-radius: 3px; padding: 1px 4px; }
   [contenteditable] { background: var(--edit); border-bottom: 1px dashed var(--edit-line); outline: none;
     padding: 0 2px; border-radius: 2px; min-width: 1.5em; display: inline-block; }
@@ -68,6 +70,13 @@
   details { margin-top: 16px; background: var(--paper); border: 1px solid var(--border); border-radius: 4px; padding: 8px 16px; }
   details pre { white-space: pre-wrap; font: inherit; font-size: 14px; margin: 8px 0; }
   dialog { width: min(900px, 92vw); border: 1px solid var(--border); border-radius: 6px; background: var(--paper); color: var(--ink); }
+  .bar .news { margin-left: auto; font-size: 13px; color: var(--muted); }
+  #newsList { max-height: 60vh; overflow: auto; font-size: 14px; }
+  #newsList details { margin: 0; border: 0; border-top: 1px solid var(--border); border-radius: 0; padding: 4px 0; background: none; }
+  #newsList details.nobody summary { list-style: none; cursor: default; padding-left: 14px; }
+  #newsList summary { cursor: pointer; }
+  #newsList .d { color: var(--muted); margin-right: 8px; font-size: 13px; }
+  #newsList pre { white-space: pre-wrap; margin: 4px 0 4px 20px; font: inherit; font-size: 13px; color: var(--muted); }
   dialog textarea { width: 100%; height: 50vh; font: inherit; font-size: 14px; background: var(--bg); color: var(--ink); }
   .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--paper);
     padding: 8px 18px; border-radius: 6px; opacity: 0; transition: opacity .2s; pointer-events: none; }
@@ -212,6 +221,7 @@
   <button id="export">备份到文件</button>
   <label class="btn">从备份恢复<input type="file" id="import" accept=".json" hidden></label>
   <span class="msg" id="msg"></span>
+  <button id="news" class="news" title="看这个页面最近改了什么">最近更新</button>
 </div>
 <main>
   <div class="jgrid jonly">
@@ -241,6 +251,11 @@
 <dialog id="histDlg">
   <p><select id="histSel"></select> <button id="histClose">关闭</button></p>
   <textarea id="histText" readonly></textarea>
+</dialog>
+<dialog id="newsDlg">
+  <p>最近的修改（来自 GitHub，点一行看细节）<button id="newsClose" style="float:right">关闭</button></p>
+  <div id="newsList"></div>
+  <p><a href="https://github.com/geminiu88-dot/quick_journal/commits/main" target="_blank" rel="noopener">在 GitHub 上看全部</a></p>
 </dialog>
 <dialog id="sampleDlg">
   <p>日志格式范本（日志格式-BC组员-2251023）<button id="sampleClose" style="float:right">关闭</button></p>
@@ -586,7 +601,7 @@ function genLines() {
   let sec = "hours";
   const add = (t, bad = "", raw, key) => L.push({ t: raw ? t : tight(t), bad, key: key || sec + ":" + L.length, sec });
   const items = (list, withCat) => list.filter(alive).forEach(x => add(itemText(x, withCat), itemBad(x), false, "i:" + x.id));
-  HOUR_LABELS.forEach((label, i) => { const es = S.entries.filter(e => e.cat === i), n = noteOf(es); add("@" + label + sumOf(es) + (n ? "（" + n + "）" : ""), "", false, "h:" + label); });
+  HOUR_LABELS.forEach((label, i) => { const es = S.entries.filter(e => e.cat === i), n = noteOf(es); add("@" + label + (sumOf(es) || "0h") + (n ? "（" + n + "）" : ""), "", false, "h:" + label); });
   add("@总计" + hoursTotal(), S.entries.length ? "" : "今日工时还没填", false, "h:total");
   sec = "daily"; add("▲每日回顾：", "", false, "daily:head");
   DAILY.forEach(sp => { const r = specText(sp); add(r.t, r.bad, false, "d:" + sp[0]); });
@@ -616,14 +631,22 @@ function genLines() {
   return withExtra(L);
 }
 // your own lines, exactly as typed, each under the line it was added to; if that line is gone (an item closed),
-// at the end of the same section. A line added under one of your own lines follows it.
+// just above the line that was below it; if both are gone, at the end of the same section, in red until it is
+// put under a line again with 「移」.
+// A line added under one of your own lines follows it.
 function withExtra(L) {
   const ex = S.extra || []; if (!ex.length) return L;
-  const keys = new Set([...L.map(l => l.key), ...ex.map(x => "x:" + x.id)]), end = {};
-  L.forEach(l => { end[l.sec] = l.key; });
-  const where = x => keys.has(x.after) ? x.after : end[x.sec] || L[L.length - 1].key;
-  const out = [], emit = k => ex.filter(x => where(x) === k).forEach(x => { out.push({ t: x.text, bad: "", key: "x:" + x.id, sec: x.sec, extra: x }); emit("x:" + x.id); });
-  L.forEach(l => { out.push(l); emit(l.key); });
+  const keys = new Set([...L.map(l => l.key), ...ex.map(x => "x:" + x.id)]), at = {}, end = {};
+  L.forEach((l, i) => { at[l.key] = i; end[l.sec] = l.key; });
+  // each own line also remembers the line below it (x.before), so it can stay above that one if the line above goes
+  ex.forEach(x => { if (x.after in at) x.before = (L[at[x.after] + 1] || {}).key; });
+  const where = x => keys.has(x.after) ? x.after : x.before in at ? "before:" + x.before : end[x.sec] || L[L.length - 1].key;
+  const out = [], emit = k => ex.filter(x => where(x) === k).forEach(x => {
+    const lost = !keys.has(x.after) && !(x.before in at);   // both lines gone: red until moved with 「移」
+    out.push({ t: x.text, bad: lost ? "它上下的行都没了：按「移」再点一行左边的点，放到那行下面" : "", key: "x:" + x.id, sec: x.sec, extra: x });
+    emit("x:" + x.id);
+  });
+  L.forEach(l => { emit("before:" + l.key); out.push(l); emit(l.key); });
   return out;
 }
 // stable ids for items, clients and product lines (the place keys of their lines)
@@ -641,10 +664,12 @@ function renderPreview() {
   lines.forEach(l => {
     const d = el("div", "line" + (l.bad ? " badline" : "") + (l.extra ? " extra" : ""), l.t || " "); if (l.bad) d.title = l.bad;
     const plus = el("span", "addline", "＋"); plus.title = "在这行下面加一行自己的内容（每天都保留，按原样）";
-    plus.addEventListener("click", ev => { ev.stopPropagation(); editExtra(d, null, l); });
+    plus.addEventListener("click", ev => { ev.stopPropagation(); if (moving) moveExtra(l); else editExtra(d, null, l); });
     d.append(plus);
     if (l.extra) {
-      d.title = "自己加的行：点一下修改";
+      if (!l.bad) d.title = "自己加的行：点一下修改";
+      if (moving === l.extra) d.classList.add("movingline");
+      d.append(ui("移", ev => { ev.stopPropagation(); moving = l.extra; document.body.classList.add("moving"); renderPreview(); toast("点一行左边的点，这行就放到那行下面（Esc 取消）"); }, "放到别的行下面"));
       d.addEventListener("click", () => editExtra(d, l.extra, l));
       d.append(xBtn("删掉这行", ev => { ev.stopPropagation(); dropExtra(l.extra); }));
     }
@@ -675,6 +700,18 @@ function editExtra(lineDiv, x, l) {
   box.addEventListener("blur", () => done(true));
   if (x) lineDiv.replaceWith(box); else lineDiv.after(box);
   box.focus();
+}
+// 「移」: the next ＋ clicked takes this one line to just under that line
+let moving = null;
+function stopMoving() { moving = null; document.body.classList.remove("moving"); }
+document.addEventListener("keydown", ev => { if (ev.key === "Escape" && moving) { stopMoving(); renderPreview(); } });
+function moveExtra(l) {
+  const x = moving; stopMoving();
+  if (l.key === "x:" + x.id) { renderPreview(); return; }
+  // only this line moves: own lines that were under it stay where they are (they take its old place)
+  S.extra.forEach(y => { if (y.after === "x:" + x.id) { y.after = x.after; if (x.before) y.before = x.before; } });
+  S.extra.forEach(y => { if (y.after === l.key && y !== x) y.after = "x:" + x.id; });
+  x.after = l.key; x.sec = l.sec; delete x.before; changed(); save();
 }
 function dropExtra(x) {
   // lines added under this one move up to its place
@@ -1168,6 +1205,27 @@ document.getElementById("hist").addEventListener("click", () => {
 });
 histSel.addEventListener("change", () => { histText.value = S.archive[histSel.value]; });
 document.getElementById("histClose").addEventListener("click", () => histDlg.close());
+
+// 最近更新: the page's recent commits, fetched from GitHub only when the button is pressed (needs internet)
+const newsDlg = document.getElementById("newsDlg"), newsList = document.getElementById("newsList");
+document.getElementById("newsClose").addEventListener("click", () => newsDlg.close());
+document.getElementById("news").addEventListener("click", async () => {
+  newsList.textContent = "正在读取…"; newsDlg.showModal();
+  try {
+    const r = await fetch("https://api.github.com/repos/geminiu88-dot/quick_journal/commits?per_page=20");
+    if (!r.ok) throw new Error(r.status);
+    const list = await r.json(); newsList.textContent = "";
+    for (const c of list) {
+      const msg = c.commit.message.replace(/\n*(Co-Authored-By|Claude-Session):.*$/gim, "").trim();
+      const [head, ...rest] = msg.split("\n"), body = rest.join("\n").trim();
+      const d = new Date(c.commit.author.date), when = (d.getMonth() + 1) + "/" + d.getDate();
+      const box = el("details"), sum = el("summary");
+      sum.append(el("span", "d", when), head); box.append(sum);
+      if (body) box.append(el("pre", "", body)); else box.classList.add("nobody");
+      newsList.append(box);
+    }
+  } catch (e) { newsList.textContent = "读不到（可能网络连不上 GitHub）。可以点下面的链接直接看。"; }
+});
 
 const impDlg = document.getElementById("impDlg"), impText = document.getElementById("impText"),
   impResult = document.getElementById("impResult"), impDo = document.getElementById("impDo");
