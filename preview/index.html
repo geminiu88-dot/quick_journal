@@ -2268,6 +2268,8 @@ async function importXlsx(file) {
   const finish = (x, st) => {
     if (isOk(st) && status(x) !== "OK") x.keptOk = true;
     if (!x.got) { const d = pastDate(x.code.slice(0, 4), x.xDate ? fromIso(x.xDate) : DAY); x.got = d ? iso(d) : today(); }
+    // an open task with an empty 进展备注 gets the first action line every task starts with (owner, 2026-11-26)
+    if (!x.notes.trim() && status(x) !== "OK") { x.notes = mmdd(fromIso(x.got)) + "已查收"; x.edited = true; }
     items.push(x);
   };
   [B.direct, B.indirect].forEach(sh => {
