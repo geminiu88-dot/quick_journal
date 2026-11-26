@@ -81,6 +81,12 @@
   .line.jump { cursor: pointer; } .line.jump:hover { background: var(--calc); }
   .pdate { font-size: 12px; color: var(--muted); white-space: nowrap; } .pdate.bad { color: var(--bad-line); }
   .focusbox { outline: 1px solid var(--ui); outline-offset: 3px; border-radius: 2px; }
+  #impDlg { width: min(1300px, 96vw); }
+  #impCompare { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px; }
+  #impCompare .cmp { max-height: 50vh; overflow: auto; border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px; font-size: 13px; line-height: 1.6; }
+  #impCompare .cl { white-space: pre-wrap; word-break: break-all; }
+  #impCompare .cl.miss { background: var(--bad); } #impCompare .cl.raw { background: var(--edit); }
+  @media (max-width: 900px) { #impCompare { grid-template-columns: 1fr; } }
   #impClients label.impc { display: block; font-size: 14px; cursor: pointer; }
   #impClients p { margin: 4px 0; font-size: 13px; color: var(--muted); }
   dialog textarea { width: 100%; height: 50vh; font: inherit; font-size: 14px; background: var(--bg); color: var(--ink); }
@@ -279,6 +285,7 @@
   <textarea id="impText"></textarea>
   <p><button id="impCheck">检查</button> <button id="impDo" disabled>导入</button> <button id="impClose">关闭</button></p>
   <div id="impClients"></div>
+  <div id="impCompare"></div>
   <pre id="impResult" style="white-space:pre-wrap"></pre>
 </dialog>
 <div class="toast" id="toast"></div>
@@ -1187,7 +1194,7 @@ function parseItem(t, withCat) {
 }
 // mark = { line number: true/false } from the client ticks in the import dialog (overrides the 3-capitals rule)
 function parseJournal(raw, mark = {}) {
-  const s = blank(), missed = [], c1 = [];   // c1 = the unmarked lines of the client block, for the ticks
+  const s = blank(), missed = [], c1 = [], state = [];   // state[line] = "ok" | "miss" (kept as an own line) | "raw" (kept as typed)   // c1 = the unmarked lines of the client block, for the ticks
   let sec = "", client = null, pl = null, read = 0;
   // a line it can't read becomes one of your own lines (S.extra), under the last line it did read (owner, 2026-11-25)
   s.extra = [];
@@ -1195,9 +1202,11 @@ function parseJournal(raw, mark = {}) {
   const SEC = { daily: "daily", remind: "remind", focus: "focus", weekly: "weekly", clients: "c1", c1none: "c1none", c2: "c2" };
   const seen = (key, sc) => { anchor = key; asec = sc || SEC[sec] || "hours"; chain = null; };
   let raw0 = "";
-  const miss = () => { missed.push(raw0.trim()); const x = { id: newId(), after: chain ? "x:" + chain : anchor, sec: asec, text: raw0 }; s.extra.push(x); chain = x.id; };
+  let n = 0;
+  const miss = () => { state[n] = "miss"; missed.push(raw0.trim()); const x = { id: newId(), after: chain ? "x:" + chain : anchor, sec: asec, text: raw0 }; s.extra.push(x); chain = x.id; };
   const lines = raw.split(/\r?\n/).map(l => l.replace(/\s+$/, "")).filter(l => l.trim());
-  for (const [n, line] of lines.entries()) {
+  for (const [i, line] of lines.entries()) {
+    n = i; state[n] = "ok";
     let t = line; raw0 = t; t = t.trim();
     if (/^(规则|备忘|●备忘)|^——/.test(t) || /^●\s*备忘/.test(t)) { if (/规则/.test(t)) break; sec = "skip"; continue; }
     if (/^-{5,}/.test(t)) continue;
@@ -1229,7 +1238,7 @@ function parseJournal(raw, mark = {}) {
         const same = specs.find(sp => sp.some(p => p.f) && labelOf(sp[0]) === labelOf(t));
         const loose = same && looseRead(same, t);
         if (loose) { same.filter(p => p.f).forEach((p, i) => { s.f[p.f] = loose[i]; }); read++; seen((sec === "daily" ? "d:" : "w:") + same[0]); continue; }
-        if (same) { (s.raw ||= {})[same[0]] = raw0.trim(); read++; seen((sec === "daily" ? "d:" : "w:") + same[0]); continue; }
+        if (same) { state[n] = "raw"; (s.raw ||= {})[same[0]] = raw0.trim(); read++; seen((sec === "daily" ? "d:" : "w:") + same[0]); continue; }
         if (sec === "daily" && /^[+\-－–—]\s*W\d+/.test(t)) { const x = parseItem(t, false); if (x) { x.id = newId(); s.remind.push(x); read++; seen("i:" + x.id, "remind"); continue; } }
         miss(); continue;
       }
@@ -1264,7 +1273,7 @@ function parseJournal(raw, mark = {}) {
     }
     miss();
   }
-  return { s, missed, read, c1 };
+  return { s, missed, read, c1, lines, state };
 }
 
 // ---------- toolbar ----------
@@ -1327,7 +1336,7 @@ document.getElementById("news").addEventListener("click", async () => {
 const impDlg = document.getElementById("impDlg"), impText = document.getElementById("impText"),
   impResult = document.getElementById("impResult"), impDo = document.getElementById("impDo");
 let parsed = null;
-document.getElementById("imp").addEventListener("click", () => { impResult.textContent = ""; document.getElementById("impClients").innerHTML = ""; impMark = {}; impDo.disabled = true; impDlg.showModal(); });
+document.getElementById("imp").addEventListener("click", () => { impResult.textContent = ""; document.getElementById("impClients").innerHTML = ""; document.getElementById("impCompare").innerHTML = ""; impMark = {}; impDo.disabled = true; impDlg.showModal(); });
 document.getElementById("impClose").addEventListener("click", () => impDlg.close());
 // the client block's unmarked lines with a tick each: ticked = a client line (简称 before 前/后), else a product line
 let impMark = {};
@@ -1344,9 +1353,20 @@ function showImpClients() {
   });
 }
 document.getElementById("impCheck").addEventListener("click", () => check());
+// the pasted journal beside the template sample: red = not read (kept as an own line), yellow = kept as typed
+function showCompare() {
+  const box = document.getElementById("impCompare"); box.innerHTML = "";
+  const mine = el("div", "cmp"), tpl = el("div", "cmp");
+  mine.append(el("b", "", "你的日志"), el("span", "hint", "　红 = 没读懂（照原样留着）　黄 = 认出是哪一行，但写法不同（照原样留着）"));
+  parsed.lines.forEach((t, i) => mine.append(el("div", "cl " + parsed.state[i], t)));
+  tpl.append(el("b", "", "格式范本"));
+  const all = SAMPLE.split("\n");
+  all.slice(0, all.findIndex(l => /^——/.test(l))).filter(l => l.trim()).forEach(t => tpl.append(el("div", "cl", t)));
+  box.append(mine, tpl);
+}
 function check() {
   parsed = parseJournal(impText.value, impMark);
-  showImpClients();
+  showImpClients(); showCompare();
   const cl = parsed.s.clients.map(c => c.name + (c.role ? "（" + c.role + "）" : ""));
   impResult.textContent = "读懂了 " + parsed.read + " 行。" + (cl.length ? "C1有单老客 " + cl.length + " 个：" + cl.join("、") + "。" : "C1有单老客：一个也没读到。") +
     (parsed.missed.length ? "\n下面 " + parsed.missed.length + " 行没读懂：导入后照原样放在原来的位置，作为自己加的行（蓝色，可以改或删）：\n" + parsed.missed.join("\n") : "全部读懂。");
