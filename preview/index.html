@@ -2011,9 +2011,9 @@ function fillList(B, sheet, items, base) {
   B.put(sheet.file, xmlText(d));
 }
 
-// 02新增统计: the filter on 月份 (column B) shows only this month and last month, older months' rows hidden
+// 02新增统计: the filter on 月份 (column B) shows only this month, older months' rows hidden
 function filterRecentMonths(B, sheet, d, sd, lastRow) {
-  const keep = [monthCode(new Date(DAY.getFullYear(), DAY.getMonth() - 1, 1)), monthCode(DAY)].map(String), ws = d.documentElement;
+  const keep = [String(monthCode(DAY))], ws = d.documentElement;   // only this month shows (owner, 2026-11-26)
   [...sd.getElementsByTagName("row")].forEach(row => {
     const r = +row.getAttribute("r"); if (r === 1) return;
     if (keep.includes(String(cellVal(B, rowCells(row)[2])).trim())) row.removeAttribute("hidden"); else row.setAttribute("hidden", "1");
