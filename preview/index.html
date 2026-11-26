@@ -886,14 +886,7 @@ function itemCard(list, x, withCat) {
   const plan = el("input", "short"); plan.inputMode = "numeric"; plan.maxLength = 4; plan.placeholder = "计划MMDD";
   plan.title = "计划日期：4位数字，如 1130（要晚于今天）"; plan.value = x.plan === "X" ? "" : x.plan;
   const said = el("span", "pdate");
-  const sayDate = () => {
-    const v = plan.value.trim(), d = mmddToDate(v, DAY), ok = d && d.getDate() === +v.slice(2);
-    const days = ok ? Math.round((d - DAY) / 864e5) : 0;
-    said.textContent = !v ? "" : !/^\d{4}$/.test(v) ? "要4位数字，如 1130" : !ok ? "没有这一天" :
-      (d.getMonth() + 1) + "月" + d.getDate() + "日 周" + "日一二三四五六"[d.getDay()] + (days > 0 ? "，还有" + days + "天" : "，要晚于今天");
-    said.classList.toggle("bad", !!v && !(ok && days > 0));
-    return ok ? v : "";
-  };
+  const sayDate = () => sayPlan(plan.value, said);
   sayDate();
   plan.addEventListener("input", () => { const v = sayDate(); if (v) { x.plan = v; x.closed = ""; touch(); changed(); } });
   const upd = el("button", "", "今日更新");
@@ -1519,6 +1512,7 @@ function slips(x) {
   if (!isF(x) && !x.desc.trim()) p.push("没有描述");
   // a "见批注" line points at an Excel comment (shown on the card): not a slip
   if (noteLines(x).some(l => !/^\d{4}/.test(l) && !l.includes("见批注"))) p.push("备注每行要以日期开头");
+  if (!isF(x) && status(x) !== "OK" && !linePlan(lastLine(x))) p.push("最后一行末尾要写计划日期");
   return p;
 }
 // F sheets say in their name which weekdays they are reviewed: F1立体模具缝周1周4 = Monday and Thursday
@@ -1712,6 +1706,19 @@ async function loadImages() {
   } catch (e) { IMAGES = {}; }
   imagesLoading = false;
 }
+// a plan date box (4 digits, MMDD) spells out the date it means next to it, to check (owner, 2026-11-26);
+// returns the date when it is a real day, else ""
+function sayPlan(value, said) {
+  const v = value.trim(), d = mmddToDate(v, DAY), ok = d && d.getDate() === +v.slice(2);
+  const days = ok ? Math.round((d - DAY) / 864e5) : 0;
+  said.textContent = !v ? "" : !/^\d{4}$/.test(v) ? "要4位数字，如 1130" : !ok ? "没有这一天" :
+    (d.getMonth() + 1) + "月" + d.getDate() + "日 周" + "日一二三四五六"[d.getDay()] + (days > 0 ? "，还有" + days + "天" : "，要晚于今天");
+  said.classList.toggle("bad", !!v && !(ok && days > 0));
+  return ok ? v : "";
+}
+// the last record line: its date at the start, the plan date at the end ("1126已查收，等回复1130"), X when closed
+function lastLine(x) { const ls = noteLines(x); return ls[ls.length - 1] || ""; }
+function linePlan(l) { const m = l.length >= 8 && l.match(/^\d{4}.*?(\d{4})$/); return m ? m[1] : ""; }
 function card(x) {
   const td = TD(), box = el("div", "card"), f = isF(x);
   const top = el("div", "cardtop");
@@ -1741,7 +1748,25 @@ function card(x) {
   const upd = el("button", "", "今日更新");
   const done = el("button", "", "收官 X");
   const prob = el("span", "prob");
-  btns.append(upd, done, prob);
+  // same bar as the journal: last line's date -> plan date at the end of the last line (owner, 2026-11-26)
+  const from = el("span", "legend"), closedX = el("b", "", "X");
+  const plan = el("input", "short"); plan.inputMode = "numeric"; plan.maxLength = 4; plan.placeholder = "计划MMDD";
+  plan.title = "计划日期：写在最后一行末尾，4位数字，如 1130（要晚于今天）";
+  const said = el("span", "pdate");
+  const bar = () => {
+    const l = lastLine(x), shut = /[Xx]$/.test(l);
+    from.textContent = /^\d{4}/.test(l) ? l.slice(0, 4) : "—";
+    plan.hidden = said.hidden = shut; closedX.hidden = !shut;
+    if (document.activeElement !== plan) plan.value = linePlan(l);
+    sayPlan(plan.value, said);
+  };
+  plan.addEventListener("input", () => {
+    const v = sayPlan(plan.value, said); if (!v) return;
+    const ls = x.notes.replace(/\s+$/, "").split("\n"), l = ls[ls.length - 1].trim();
+    ls[ls.length - 1] = !l ? T() + v : linePlan(l) ? l.slice(0, -4) + v : l + v;
+    x.notes = ls.join("\n"); x.keptOk = false; paint(); changedItem();
+  });
+  btns.append(from, el("span", "arrow", "→"), plan, said, closedX, upd, done, prob);
   if (x.comment) { const c = el("details", "cmt"); c.append(el("summary", "", "Excel 批注"), el("pre", "", x.comment)); box.append(c); }
   box.append(older, notes, btns);
 
@@ -1750,7 +1775,7 @@ function card(x) {
     const ls = x.notes.replace(/\s+$/, "").split("\n"), k = expanded ? 0 : Math.max(0, ls.length - SHOW_LINES);
     hidden = ls.slice(0, k); notes.value = ls.slice(k).join("\n");
     older.textContent = expanded ? "▲ 收起" : "▼ 展开更早的 " + hidden.length + " 条记录";
-    older.hidden = !expanded && !hidden.length; fit();
+    older.hidden = !expanded && !hidden.length; fit(); bar();
   };
   older.addEventListener("click", () => { expanded = !expanded; paint(); });
   const show = () => {
@@ -1764,7 +1789,7 @@ function card(x) {
   code.addEventListener("input", () => { x.code = code.textContent.trim().toUpperCase(); changedItem(); });
   desc.addEventListener("input", () => { x.desc = desc.textContent; changedItem(); });
   [code, desc].forEach(e => e.addEventListener("keydown", ev => { if (ev.key === "Enter") { ev.preventDefault(); e.blur(); } }));
-  notes.addEventListener("input", () => { x.notes = [...hidden, notes.value].join("\n"); x.keptOk = false; fit(); changedItem(); });
+  notes.addEventListener("input", () => { x.notes = [...hidden, notes.value].join("\n"); x.keptOk = false; fit(); bar(); changedItem(); });
   const appendLine = s => { x.notes = x.notes.replace(/\s+$/, "") + (x.notes.trim() ? "\n" : "") + s; x.keptOk = false; paint(); changedItem(); };
   upd.addEventListener("click", () => {
     const ls = noteLines(x);
