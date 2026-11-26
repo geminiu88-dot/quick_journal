@@ -1486,6 +1486,7 @@ function planOf(x) { const ls = noteLines(x); const m = ls.length && ls[ls.lengt
 function planDate(x) {
   const ls = noteLines(x), last = ls[ls.length - 1] || "", md = planOf(x);
   if (!md || last.length <= 4) return null;
+  if (md === FOREVER) return new Date(9999, 0, 1);
   const from = pastDate(last.slice(0, 4), DAY) || DAY;
   let d = new Date(from.getFullYear(), +md.slice(0, 2) - 1, +md.slice(2));
   if (d.getMonth() !== +md.slice(0, 2) - 1) return null;
@@ -1706,8 +1707,10 @@ async function loadImages() {
 }
 // a plan date box (4 digits, MMDD) spells out the date it means next to it, to check (owner, 2026-11-26);
 // returns the date when it is a real day, else ""
-function sayPlan(value, said) {
-  const v = value.trim(), d = mmddToDate(v, DAY), ok = d && d.getDate() === +v.slice(2);
+function sayPlan(value, said, forever) {
+  const v = value.trim();
+  if (forever && v === FOREVER) { said.textContent = "长期，没有期限"; said.classList.remove("bad"); return v; }
+  const d = mmddToDate(v, DAY), ok = d && d.getDate() === +v.slice(2);
   const days = ok ? Math.round((d - DAY) / 864e5) : 0;
   said.textContent = !v ? "" : !/^\d{4}$/.test(v) ? "要4位数字，如 1130" : !ok ? "没有这一天" :
     (d.getMonth() + 1) + "月" + d.getDate() + "日 周" + "日一二三四五六"[d.getDay()] + (days > 0 ? "，还有" + days + "天" : "，要晚于今天");
@@ -1715,6 +1718,8 @@ function sayPlan(value, said) {
   return ok ? v : "";
 }
 // the last record line: its date at the start, the plan date at the end ("1126已查收，等回复1130"), X when closed
+// 9999 as a to-do plan date = kept open with no deadline (owner, 2026-11-26)
+const FOREVER = "9999";
 function lastLine(x) { const ls = noteLines(x); return ls[ls.length - 1] || ""; }
 function linePlan(l) { const m = l.length >= 8 && l.match(/^\d{4}.*?(\d{4})$/); return m ? m[1] : ""; }
 function card(x) {
@@ -1749,17 +1754,17 @@ function card(x) {
   // same bar as the journal: last line's date -> plan date at the end of the last line (owner, 2026-11-26)
   const from = el("span", "legend"), closedX = el("b", "", "X");
   const plan = el("input", "short"); plan.inputMode = "numeric"; plan.maxLength = 4; plan.placeholder = "计划MMDD";
-  plan.title = "计划日期：写在最后一行末尾，4位数字，如 1130（要晚于今天）";
+  plan.title = "计划日期：写在最后一行末尾，4位数字，如 1130（要晚于今天）；9999 = 长期，没有期限";
   const said = el("span", "pdate");
   const bar = () => {
     const l = lastLine(x), shut = /[Xx]$/.test(l);
     from.textContent = /^\d{4}/.test(l) ? l.slice(0, 4) : "—";
     plan.hidden = said.hidden = shut; closedX.hidden = !shut;
     if (document.activeElement !== plan) plan.value = linePlan(l);
-    sayPlan(plan.value, said);
+    sayPlan(plan.value, said, true);
   };
   plan.addEventListener("input", () => {
-    const v = sayPlan(plan.value, said); if (!v) return;
+    const v = sayPlan(plan.value, said, true); if (!v) return;
     const ls = x.notes.replace(/\s+$/, "").split("\n"), l = ls[ls.length - 1].trim();
     ls[ls.length - 1] = !l ? T() + v : linePlan(l) ? l.slice(0, -4) + v : l + v;
     x.notes = ls.join("\n"); x.keptOk = false; paint(); changedItem();
@@ -2005,9 +2010,9 @@ function fillList(B, sheet, items, base) {
   B.put(sheet.file, xmlText(d));
 }
 
-// 02新增统计: the filter on 月份 (column B) shows only this month and last month, older months' rows hidden
+// 02新增统计: the filter on 月份 (column B) shows only this month, older months' rows hidden
 function filterRecentMonths(B, sheet, d, sd, lastRow) {
-  const keep = [monthCode(new Date(DAY.getFullYear(), DAY.getMonth() - 1, 1)), monthCode(DAY)].map(String), ws = d.documentElement;
+  const keep = [String(monthCode(DAY))], ws = d.documentElement;   // only this month shows (owner, 2026-11-26)
   [...sd.getElementsByTagName("row")].forEach(row => {
     const r = +row.getAttribute("r"); if (r === 1) return;
     if (keep.includes(String(cellVal(B, rowCells(row)[2])).trim())) row.removeAttribute("hidden"); else row.setAttribute("hidden", "1");

@@ -78,7 +78,7 @@ exact format on the right, made from the form. 「复制日志」 copies that te
 - **Plan date on a to-do card:** the bar under the notes shows the last line's
   date → a 4-digit plan box (date spelled out, like the journal). The box
   writes/replaces the plan date at the end of the last line; an open task whose
-  last line has none is flagged.
+  last line has none is flagged. 9999 = kept open with no deadline (长期，没有期限; to-do list only).
 - **Kanban:** one column per list side by side: 直接上级, 间接上级 ·
   大老板, and each F tracking sheet in use. In each column: 要处理 (overdue, no
   plan date, no record; for an F sheet: not updated on its review day, read
@@ -96,7 +96,7 @@ exact format on the right, made from the form. 「复制日志」 copies that te
   (nothing of the old sheet is kept but its look): 8 rows per month (4 without
   01间接上级), from the first month with a task to now; 0 on past Mon-Fri, Sat/Sun
   empty (no holidays); every day cell of a row gets the row's bordered style;
-  汇总 days are empty when there are no numbers. Untouched sheets go out byte for byte.
+  汇总 days are empty when there are no numbers. The 月份 filter shows only this month. Untouched sheets go out byte for byte.
   「导入Excel」 reads your current file once and makes it the template, kept in
   this browser's IndexedDB (room for big files; localStorage holds ~5 MB). A
   list never imported uses the built-in file. The built-in template
