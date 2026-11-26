@@ -2427,7 +2427,7 @@ function tab(name) {
   if (name === "todo") renderTodo();
   if (name === "eval") renderEval();
   const erpFrame = document.getElementById("erpFrame");
-  if (name === "erp" && !erpFrame.src) erpFrame.src = "../erp.html";
+  if (name === "erp" && !erpFrame.src) erpFrame.src = "erp.html";
 }
 document.getElementById("tabJournal").addEventListener("click", () => { tab("journal"); render(); });
 document.getElementById("tabTodo").addEventListener("click", () => tab("todo"));
