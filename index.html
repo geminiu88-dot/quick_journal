@@ -78,7 +78,14 @@
   #newsList .d { color: var(--muted); margin-right: 8px; font-size: 13px; }
   #newsList pre { white-space: pre-wrap; margin: 4px 0 4px 20px; font: inherit; font-size: 13px; color: var(--muted); }
   .line.jump { cursor: pointer; } .line.jump:hover { background: var(--calc); }
+  .pdate { font-size: 12px; color: var(--muted); white-space: nowrap; } .pdate.bad { color: var(--bad-line); }
   .focusbox { outline: 1px solid var(--ui); outline-offset: 3px; border-radius: 2px; }
+  #impDlg { width: min(1300px, 96vw); }
+  #impCompare { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px; }
+  #impCompare .cmp { max-height: 50vh; overflow: auto; border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px; font-size: 13px; line-height: 1.6; }
+  #impCompare .cl { white-space: pre-wrap; word-break: break-all; }
+  #impCompare .cl.miss { background: var(--bad); } #impCompare .cl.raw { background: var(--edit); }
+  @media (max-width: 900px) { #impCompare { grid-template-columns: 1fr; } }
   #impClients label.impc { display: block; font-size: 14px; cursor: pointer; }
   #impClients p { margin: 4px 0; font-size: 13px; color: var(--muted); }
   dialog textarea { width: 100%; height: 50vh; font: inherit; font-size: 14px; background: var(--bg); color: var(--ink); }
@@ -277,6 +284,7 @@
   <textarea id="impText"></textarea>
   <p><button id="impCheck">检查</button> <button id="impDo" disabled>导入</button> <button id="impClose">关闭</button></p>
   <div id="impClients"></div>
+  <div id="impCompare"></div>
   <pre id="impResult" style="white-space:pre-wrap"></pre>
 </dialog>
 <div class="toast" id="toast"></div>
@@ -319,8 +327,8 @@ const T = () => mmdd(DAY);
 const DAILY = [
   ["*组内日常清单表：", { d: 1 }, "当天接收", { c: "tdIn" }, "，当天完成", { c: "tdDone" }, "，未结", { c: "tdOpen" }, "，传递：", { c: "tdSent" }],
   // the big boss's own list (01间接上级), counted apart (owner, 2026-11-25); only for people who have items on it.
-  // WORDING NOT FINAL: the owner will give it
-  Object.assign(["*大老板日常清单表：", { d: 1 }, "当天接收", { c: "tdBIn" }, "，当天完成", { c: "tdBDone" }, "，未结", { c: "tdBOpen" }],
+  // wording from the owner (2026-11-26): "*老板日常清单表：1125当天接收0，当天完成0，未结6，传递：无传"
+  Object.assign(["*老板日常清单表：", { d: 1 }, "当天接收", { c: "tdBIn" }, "，当天完成", { c: "tdBDone" }, "，未结", { c: "tdBOpen" }, "，传递：", { c: "tdBSent" }],
     { auto: true, show: () => TD().items.some(x => sheetOf(x) === "indirect") }),
   ["*接单/出货系统更新：", { d: 1 }, { f: "d2" }],
   ["*在手需下样还未下样款数：", { d: 1 }, { f: "d3" }],
@@ -401,7 +409,9 @@ function newDay() {
   S.hours.forEach(h => { h.h = ""; h.note = ""; });
   S.entries = [];
   fieldsOf(DAILY).forEach(k => { S.f[k] = ""; });
-  if (DAY.getDay() === 5) {                                  // Friday: weekly review starts empty, dated today
+  DAILY.forEach(sp => { if (S.raw) delete S.raw[sp[0]]; });
+  if (DAY.getDay() === 5) {
+    WEEKLY.forEach(sp => { if (S.raw) delete S.raw[sp[0]]; });                                  // Friday: weekly review starts empty, dated today
     const lastWeek = S.f.w15n || "";                       // this week's 超30天样单数 becomes next week's 上周
     fieldsOf(WEEKLY).forEach(k => { S.f[k] = ""; });
     S.f.w15p = lastWeek;
@@ -481,7 +491,7 @@ let S = load() || seed();
 function alive(x) { return !x.closed || x.closed >= today(); }      // X items stay visible on the day they are closed
 function openFocus(cat) { return S.focus.filter(x => x.cat === cat && x.plan !== "X" && alive(x)).length; }
 function counts() {
-  const c = { c1: S.clients.length + S.c1none.filter(alive).length, c2: S.c2.filter(alive).length };
+  const c = { c1: c1Count() + S.c1none.filter(alive).length, c2: S.c2.filter(alive).length };
   CATS.slice(2).forEach(k => { c[k] = openFocus(k); });
   return c;
 }
@@ -597,10 +607,20 @@ const LINE2 = "-----------------------------------------------------";
 function itemText(x, withCat) {
   const body = (withCat && x.cat ? x.cat + "：" : "") + x.text.trim();
   // "-1128 S27某项目": the space stays when the text starts with a letter or digit (else the date runs into it)
+  // one rule for everyone (owner, 2026-11-26): a space after the date only before a letter or digit ("-0928 CGA…"), never before Chinese
   return (x.edited === today() ? "+" : "-") + x.start + (x.start && /^[A-Za-z0-9]/.test(body) ? " " : "") + body + x.plan;
 }
 function itemBad(x) { return !x.text.trim() ? "事项没写内容" : planOk(x) ? "" : "计划日期要晚于今天"; }
+// C1 clients are counted by 简称: "ABC1/ABCB前" is 2, and the same 简称 on two blocks counts once
+function c1Count() { return new Set(S.clients.flatMap(c => c.name.split(/[\/／]/).map(n => n.replace(/[:：]$/, "").trim()).filter(Boolean))).size; }
+// a fixed line whose label the import knew but whose words it couldn't read is kept as typed (S.raw), until a box is filled
+const labelOf = t => t.replace(/^\*/, "").split(/[：:]/)[0].replace(/\s/g, "");
+function rawOf(spec) {
+  const fs = spec.filter(p => p.f), raw = (S.raw || {})[spec[0]];
+  return raw && fs.length && fs.every(p => !(S.f[p.f] || "").trim()) ? raw : "";
+}
 function specText(spec) {
+  const raw = rawOf(spec); if (raw) return { t: raw, bad: "" };
   let bad = "";
   const t = spec.map(p => {
     if (typeof p === "string") return p;
@@ -633,7 +653,7 @@ function genLines() {
   sec = "weekly"; add(LINE1, "", false, "line1");
   add("●●每周回顾：以下统计值每周5更新：" + mmdd(fromIso(S.weekDate)) + "更新", "", false, "weekly:head");
   WEEKLY.forEach(sp => { const r = specText(sp); add(r.t, r.bad, false, "w:" + sp[0]); });
-  sec = "c1"; add("●C1有单老客：" + S.clients.length + "客", "", false, "c1:head");
+  sec = "c1"; add("●C1有单老客：" + c1Count() + "客", "", false, "c1:head");
   S.clients.forEach(c => c.lines.forEach((l, i) => {
     const lonely = isFront(c.role) && /前/.test(c.role) && !l.items.filter(alive).length ? "前道每条产品线至少要一条跟踪事项" : "";
     // the space between 简称+前/后 and the product line stays: it separates the two (as in the template "ABC1前 鞋1")
@@ -833,6 +853,8 @@ function specFields(sec, spec) {
     if (hint) f.append(el("span", "hint", hint));
     g.append(f);
   });
+  const raw = (S.raw || {})[spec[0]];
+  if (raw) g.append(el("div", "hint", "导入时照原样保留了这一行（格子都空着就用它；填了格子就按格子写）：" + raw));
   const out = el("div", "fout"); out.append("→ ", calc(() => specText(spec).t)); g.append(out);
   sec.append(g);
 }
@@ -859,10 +881,20 @@ function itemCard(list, x, withCat) {
   const bottom = el("div", "irow small");
   const start = el("input", "short"); start.value = x.start; start.placeholder = "入日志"; start.title = "入日志的日期（MMDD），或 W43 这样的周数";
   start.addEventListener("input", () => { x.start = start.value.trim(); touch(); changed(); });
-  const plan = el("input"); plan.type = "date";
-  const tomorrow = new Date(DAY); tomorrow.setDate(tomorrow.getDate() + 1); plan.min = iso(tomorrow); plan.title = "计划日期（要晚于今天）";
-  const pd = mmddToDate(x.plan, DAY); if (pd) plan.value = iso(pd);
-  plan.addEventListener("change", () => { if (plan.value) { x.plan = mmdd(fromIso(plan.value)); x.closed = ""; touch(); changed(); } });
+  // plan date: type 4 digits (MMDD); the date it means is spelled out next to it, to check (owner, 2026-11-26)
+  const plan = el("input", "short"); plan.inputMode = "numeric"; plan.maxLength = 4; plan.placeholder = "计划MMDD";
+  plan.title = "计划日期：4位数字，如 1130（要晚于今天）"; plan.value = x.plan === "X" ? "" : x.plan;
+  const said = el("span", "pdate");
+  const sayDate = () => {
+    const v = plan.value.trim(), d = mmddToDate(v, DAY), ok = d && d.getDate() === +v.slice(2);
+    const days = ok ? Math.round((d - DAY) / 864e5) : 0;
+    said.textContent = !v ? "" : !/^\d{4}$/.test(v) ? "要4位数字，如 1130" : !ok ? "没有这一天" :
+      (d.getMonth() + 1) + "月" + d.getDate() + "日 周" + "日一二三四五六"[d.getDay()] + (days > 0 ? "，还有" + days + "天" : "，要晚于今天");
+    said.classList.toggle("bad", !!v && !(ok && days > 0));
+    return ok ? v : "";
+  };
+  sayDate();
+  plan.addEventListener("input", () => { const v = sayDate(); if (v) { x.plan = v; x.closed = ""; touch(); changed(); } });
   const upd = el("button", "", "今日更新");
   upd.title = "在后面加上今天的日期，接着写今天做了什么";
   upd.addEventListener("click", () => {
@@ -876,7 +908,7 @@ function itemCard(list, x, withCat) {
     touch(); renderForm(); changed();
   });
   const del = xBtn("删除这一条", () => { if (confirm("删除这一条？")) { list.splice(list.indexOf(x), 1); renderForm(); changed(); } });
-  bottom.append(start, el("span", "arrow", "→"), x.plan === "X" ? el("b", "", "X") : plan, upd, end);
+  bottom.append(start, el("span", "arrow", "→"), ...(x.plan === "X" ? [el("b", "", "X")] : [plan, said]), upd, end);
   card.append(top, bottom, del);
   refreshers.push(() => { card.classList.toggle("bad", !!itemBad(x)); card.classList.toggle("closed", x.plan === "X"); });
   return card;
@@ -1133,6 +1165,21 @@ function litRe(s) {
 function specRe(spec) {
   return new RegExp("^" + spec.map(p => typeof p === "string" ? litRe(p) : p.f ? (p.pre ? "(?:" + litRe(p.pre) + "(.*?))?" : "(.*?)") : p.c ? ".*?" : "\\s*\\d{4}\\s*").join("") + "\\s*$");
 }
+// second try for a fixed line written a bit differently: any of ，,；;、 between parts (or none), units like 天/款
+// may be missing, a date only needed after the label, number boxes take only numbers. The page writes it back
+// in the template's own words.
+function looseRe(spec) {
+  let firstDate = true;
+  const lit = s => [...s.replace(/\s+/g, "")].map(ch =>
+    /[，,；;、]/.test(ch) ? "[，,；;、]?" : /[：:]/.test(ch) ? "[：:]?" : /[（(]/.test(ch) ? "[（(]?" : /[）)]/.test(ch) ? "[）)]?" :
+    /[天单款样客条]/.test(ch) ? ch + "?" : ch.replace(/[.*+?^${}()|[\]\\\/-]/g, "\\$&")).join("\\s*");
+  return new RegExp("^" + spec.map((p, i) => typeof p === "string" ? (i ? lit(p) : litRe(p)) : p.f ? (kindOf(p.f) === "n" ? "(\\d+(?:\\.\\d+)?)" : "(.*?)") : p.c ? ".*?" :
+    (firstDate ? (firstDate = false, "\\s*\\d{4}\\s*") : "\\s*(?:\\d{4})?\\s*")).join("") + "\\s*$");
+}
+function looseRead(spec, t) {
+  const m = t.match(looseRe(spec)); if (!m) return null;
+  return m.slice(1).map(v => (v || "").trim());
+}
 function parseItem(t, withCat) {
   const m = t.match(/^[+\-－–—]\s*(W\d+|M\d+|\d{4})?\s*(.*?)\s*(\d{4}|[Xx])?\s*$/);
   if (!m) return null;
@@ -1146,7 +1193,7 @@ function parseItem(t, withCat) {
 }
 // mark = { line number: true/false } from the client ticks in the import dialog (overrides the 3-capitals rule)
 function parseJournal(raw, mark = {}) {
-  const s = blank(), missed = [], c1 = [];   // c1 = the unmarked lines of the client block, for the ticks
+  const s = blank(), missed = [], c1 = [], state = [];   // state[line] = "ok" | "miss" (kept as an own line) | "raw" (kept as typed)   // c1 = the unmarked lines of the client block, for the ticks
   let sec = "", client = null, pl = null, read = 0;
   // a line it can't read becomes one of your own lines (S.extra), under the last line it did read (owner, 2026-11-25)
   s.extra = [];
@@ -1154,9 +1201,11 @@ function parseJournal(raw, mark = {}) {
   const SEC = { daily: "daily", remind: "remind", focus: "focus", weekly: "weekly", clients: "c1", c1none: "c1none", c2: "c2" };
   const seen = (key, sc) => { anchor = key; asec = sc || SEC[sec] || "hours"; chain = null; };
   let raw0 = "";
-  const miss = () => { missed.push(raw0.trim()); const x = { id: newId(), after: chain ? "x:" + chain : anchor, sec: asec, text: raw0 }; s.extra.push(x); chain = x.id; };
+  let n = 0;
+  const miss = () => { state[n] = "miss"; missed.push(raw0.trim()); const x = { id: newId(), after: chain ? "x:" + chain : anchor, sec: asec, text: raw0 }; s.extra.push(x); chain = x.id; };
   const lines = raw.split(/\r?\n/).map(l => l.replace(/\s+$/, "")).filter(l => l.trim());
-  for (const [n, line] of lines.entries()) {
+  for (const [i, line] of lines.entries()) {
+    n = i; state[n] = "ok";
     let t = line; raw0 = t; t = t.trim();
     if (/^(规则|备忘|●备忘)|^——/.test(t) || /^●\s*备忘/.test(t)) { if (/规则/.test(t)) break; sec = "skip"; continue; }
     if (/^-{5,}/.test(t)) continue;
@@ -1172,7 +1221,7 @@ function parseJournal(raw, mark = {}) {
     if (/^▲\s*每日回顾/.test(t)) { sec = "daily"; read++; seen("daily:head"); continue; }
     if (/^▲\s*提醒/.test(t)) { sec = "remind"; read++; seen("remind:head"); continue; }
     if (/^▲\s*持续关注/.test(t)) { sec = "focus"; read++; seen("focus:head"); continue; }
-    if (/^●●\s*每周回顾/.test(t)) {
+    if (/^●{1,2}\s*每周回顾/.test(t)) {
       sec = "weekly"; read++; seen("weekly:head");
       const m = t.match(/(\d{4})\s*更新/); const d = m && mmddToDate(m[1], DAY); if (d) s.weekDate = iso(d);
       continue;
@@ -1183,8 +1232,15 @@ function parseJournal(raw, mark = {}) {
     if (sec === "skip") continue;
     if (sec === "daily" || sec === "weekly") {
       t = t.replace(NOTE_RE, "");
-      const spec = (sec === "daily" ? DAILY : WEEKLY).find(sp => specRe(sp).test(t));
-      if (!spec) { miss(); continue; }
+      const specs = sec === "daily" ? DAILY : WEEKLY, spec = specs.find(sp => specRe(sp).test(t));
+      if (!spec) {
+        const same = specs.find(sp => sp.some(p => p.f) && labelOf(sp[0]) === labelOf(t));
+        const loose = same && looseRead(same, t);
+        if (loose) { same.filter(p => p.f).forEach((p, i) => { s.f[p.f] = loose[i]; }); read++; seen((sec === "daily" ? "d:" : "w:") + same[0]); continue; }
+        if (same) { state[n] = "raw"; (s.raw ||= {})[same[0]] = raw0.trim(); read++; seen((sec === "daily" ? "d:" : "w:") + same[0]); continue; }
+        if (sec === "daily" && /^[+\-－–—]\s*W\d+/.test(t)) { const x = parseItem(t, false); if (x) { x.id = newId(); s.remind.push(x); read++; seen("i:" + x.id, "remind"); continue; } }
+        miss(); continue;
+      }
       const vals = t.match(specRe(spec)).slice(1);
       spec.filter(p => p.f).forEach((p, i) => { s.f[p.f] = (vals[i] || "").trim(); });
       read++; seen((sec === "daily" ? "d:" : "w:") + spec[0]); continue;
@@ -1216,7 +1272,7 @@ function parseJournal(raw, mark = {}) {
     }
     miss();
   }
-  return { s, missed, read, c1 };
+  return { s, missed, read, c1, lines, state };
 }
 
 // ---------- toolbar ----------
@@ -1279,7 +1335,7 @@ document.getElementById("news").addEventListener("click", async () => {
 const impDlg = document.getElementById("impDlg"), impText = document.getElementById("impText"),
   impResult = document.getElementById("impResult"), impDo = document.getElementById("impDo");
 let parsed = null;
-document.getElementById("imp").addEventListener("click", () => { impResult.textContent = ""; document.getElementById("impClients").innerHTML = ""; impMark = {}; impDo.disabled = true; impDlg.showModal(); });
+document.getElementById("imp").addEventListener("click", () => { impResult.textContent = ""; document.getElementById("impClients").innerHTML = ""; document.getElementById("impCompare").innerHTML = ""; impMark = {}; impDo.disabled = true; impDlg.showModal(); });
 document.getElementById("impClose").addEventListener("click", () => impDlg.close());
 // the client block's unmarked lines with a tick each: ticked = a client line (简称 before 前/后), else a product line
 let impMark = {};
@@ -1296,9 +1352,20 @@ function showImpClients() {
   });
 }
 document.getElementById("impCheck").addEventListener("click", () => check());
+// the pasted journal beside the template sample: red = not read (kept as an own line), yellow = kept as typed
+function showCompare() {
+  const box = document.getElementById("impCompare"); box.innerHTML = "";
+  const mine = el("div", "cmp"), tpl = el("div", "cmp");
+  mine.append(el("b", "", "你的日志"), el("span", "hint", "　红 = 没读懂（照原样留着）　黄 = 认出是哪一行，但写法不同（照原样留着）"));
+  parsed.lines.forEach((t, i) => mine.append(el("div", "cl " + parsed.state[i], t)));
+  tpl.append(el("b", "", "格式范本"));
+  const all = SAMPLE.split("\n");
+  all.slice(0, all.findIndex(l => /^——/.test(l))).filter(l => l.trim()).forEach(t => tpl.append(el("div", "cl", t)));
+  box.append(mine, tpl);
+}
 function check() {
   parsed = parseJournal(impText.value, impMark);
-  showImpClients();
+  showImpClients(); showCompare();
   const cl = parsed.s.clients.map(c => c.name + (c.role ? "（" + c.role + "）" : ""));
   impResult.textContent = "读懂了 " + parsed.read + " 行。" + (cl.length ? "C1有单老客 " + cl.length + " 个：" + cl.join("、") + "。" : "C1有单老客：一个也没读到。") +
     (parsed.missed.length ? "\n下面 " + parsed.missed.length + " 行没读懂：导入后照原样放在原来的位置，作为自己加的行（蓝色，可以改或删）：\n" + parsed.missed.join("\n") : "全部读懂。");
@@ -1478,8 +1545,12 @@ function todoCount(k) {
   if (k === "tdIn") return it.filter(x => x.got === today()).length;
   if (k === "tdDone") return it.filter(x => x.xDate === today()).length;
   if (k === "tdOpen") return it.filter(x => status(x) !== "OK").length;
+  // 传递: sent today = the time; else nothing to send (无传) when nothing came in or closed today (on Mondays: and nothing
+  // open, as open ones are sent every Monday); else 未传 (owner, 2026-11-26). Both lists are in the same file.
   const s = TD().sends.filter(s => s.day === today());
-  return s.length ? s[s.length - 1].time.replace(":", "：") + "已传" : "未传";
+  if (s.length) return s[s.length - 1].time.replace(":", "：") + "已传";
+  const n = c => todoCount((boss ? "tdB" : "td") + c);
+  return !n("In") && !n("Done") && !(DAY.getDay() === 1 && n("Open")) ? "无传" : "未传";
 }
 
 // ---------- pasting boss messages ----------

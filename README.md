@@ -41,8 +41,17 @@ exact format on the right, made from the form. 「复制日志」 copies that te
   前/后), else a product line. 检查 lists the client block's lines with a tick each
   (ticked = client) to fix misreads. Unread lines are kept as own lines.
 - **Boss list**: items on 01间接上级 are counted on their own daily line under
-  组内日常清单表 (wording still to come), only when that list has items; the group
+  组内日常清单表 (*老板日常清单表：…，传递：无传 when nothing came in or closed today), only when that list has items; the group
   line counts 01直接上级 only.
+- **Import, more:** fixed lines worded a bit differently get a looser second read
+  (separators/units may differ, number boxes take only numbers) and are written back in
+  the template's words; if even that fails, the line is kept as typed (`S.raw`) until a
+  box is filled. 检查 shows the pasted text beside the 格式范本: red = not read, yellow =
+  kept as typed. ●/●● titles both work. A space after an item's date only before a
+  letter/digit.
+- **Plan date:** typed as 4 digits (MMDD); the date it means is spelled out next to it.
+- **传递:** time if sent today, else 无传 when nothing came in or closed today (Mondays:
+  and nothing open), else 未传. C1 count = distinct 简称 (ABC1/ABCB = 2).
 - **Click a journal line** to scroll the form to what makes it (thin blue box).
 - **最近更新** (top right): the last 20 commits of this repo, read from the
   GitHub API on click (needs internet), with a link to the commits page.
