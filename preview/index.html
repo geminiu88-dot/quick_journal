@@ -1445,6 +1445,8 @@ const CODE_FIND = /(\d{4})([A-Za-z]?)-(\d{1,3})(?!\d)/g;
 const CODE_RE = /^(\d{4})([A-Z]?)-(\d{1,3})$/;
 const STAT_ROWS = [["A1", "A来自直接上级-单独通知"], ["A2", "A来自直接上级-全组大群通知"], ["A3", "A来自直接上级-组内组小群通知"], ["A", "A来自直接上级-汇总"],
   ["B1", "B来自间接上级-单独通知"], ["B2", "B来自间接上级-全组大群通知"], ["B3", "B来自间接上级-组内组小群通知"], ["B", "B来自间接上级-汇总"]];
+// without a 01间接上级 sheet there are no B (间接上级) rows: a code with no letter counts as A1 单独通知
+const statRow = src => !hasBoss() && /^B/.test(src.row) ? "A" + src.row.slice(1) : src.row;
 const WORKDAYS = [1, 2, 3, 4, 5];   // Mon..Fri get a number in 02新增统计 (0 when nothing came in); Sat/Sun stay empty (owner, 2026-11-26)
 const TEMPLATE_KEY = "journal-xlsx-template";
 // the parts an Excel part points to (its .rels file), and a target path made absolute
@@ -2031,7 +2033,7 @@ function fillStats(B, sheet) {
   td.items.forEach(x => {
     if (x.imported) return;
     const s = source(x.code), dt = codeDate(x); if (!s || !dt) return;
-    const k = monthCode(dt) + "|" + s.row; (counted[k] ||= {})[dt.getDate()] = (counted[k][dt.getDate()] || 0) + 1;
+    const k = monthCode(dt) + "|" + statRow(s); (counted[k] ||= {})[dt.getDate()] = (counted[k][dt.getDate()] || 0) + 1;
   });
   const blocks = () => {
     const out = new Map();
@@ -2049,7 +2051,8 @@ function fillStats(B, sheet) {
   if (have.length) m = new Date(m.getFullYear(), m.getMonth() + 1, 1);
   // new months: copy the newest month's rows (or the standard 8 rows), values cleared, sums rewritten
   for (; m <= DAY; m = new Date(m.getFullYear(), m.getMonth() + 1, 1)) {
-    const prev = have.length ? bl.get([...bl.keys()].sort().pop()) : STAT_ROWS.map(s => ({ row: header, label: s[1], fresh: true }));
+    const prev = (have.length ? bl.get([...bl.keys()].sort().pop()) : STAT_ROWS.map(s => ({ row: header, label: s[1], fresh: true })))
+      .filter(p => hasBoss() || !/^B/.test(p.label.trim()));
     const first = last + 1;
     prev.forEach(p => {
       const r = ++last, row = d.createElementNS(NS, "row"), src = rowCells(p.row), kind = statKind(p.label);
@@ -2083,6 +2086,15 @@ function fillStats(B, sheet) {
       [3, ...Array.from({ length: 31 }, (_, i) => DAY_COL(i + 1)), SUM_COL].forEach(k => setCell(d, row, colName(k) + r, "f", `SUM(${colName(k)}${top}:${colName(k)}${r - 1})`));
     }
     bl = blocks(); have.push(monthCode(m));
+  }
+  // no 01间接上级 sheet: this month's B rows (older versions added them at the end of the sheet) are removed
+  if (!hasBoss()) {
+    for (let row = rowMap(sd).get(last); row && row !== header; row = rowMap(sd).get(last)) {
+      const c = rowCells(row);
+      if (String(cellVal(B, c[2])).trim() !== String(monthCode(DAY)) || !/^B/.test(String(cellVal(B, c[4])).trim())) break;
+      sd.removeChild(row); last--;
+    }
+    bl = blocks();
   }
   // write the numbers
   const sumStyles = new Set([...sd.getElementsByTagName("c")].filter(e => e.getElementsByTagName("f").length && e.getAttribute("s")).map(e => e.getAttribute("s")));
@@ -2122,7 +2134,7 @@ function statValues() {
   const counted = {};
   td.items.forEach(x => {
     const s = source(x.code), d = codeDate(x); if (!s || !d) return;
-    const k = monthCode(d) + "|" + s.row; (counted[k] ||= {})[d.getDate()] = (counted[k][d.getDate()] || 0) + 1;
+    const k = monthCode(d) + "|" + statRow(s); (counted[k] ||= {})[d.getDate()] = (counted[k][d.getDate()] || 0) + 1;
   });
   Object.entries(counted).forEach(([k, days]) => { out[k] ||= {}; Object.entries(days).forEach(([day, n]) => { out[k][day] = Math.max(out[k][day] || 0, n); }); });
   return out;
