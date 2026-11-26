@@ -1615,7 +1615,7 @@ function renderTodo() {
       // the same code from an earlier year is a different item: compare the dates too
       const d = pastDate(m.code.slice(0, 4), DAY);
       if (m.code && td.items.some(x => x.code.trim().toUpperCase() === m.code && +codeDate(x) === +d)) { dup.push(m.code); return; }
-      td.items.push({ code: m.code, desc: m.desc, notes: T(), xDate: "", sent: 0, okSent: false, got: today() }); added++;
+      td.items.push({ code: m.code, desc: m.desc, notes: T() + "已查收", xDate: "", sent: 0, okSent: false, got: today() }); added++;   // first action line: received (owner, 2026-11-26)
     });
     ta.value = ""; save(); renderTodo(); refresh();
     toast("加入 " + added + " 条" + (dup.length ? "；已在清单里：" + dup.join("，") : ""));
@@ -2098,9 +2098,8 @@ function fillStats(B, sheet) {
   }
   // write the numbers
   const sumStyles = new Set([...sd.getElementsByTagName("c")].filter(e => e.getElementsByTagName("f").length && e.getAttribute("s")).map(e => e.getAttribute("s")));
-  // 0 on an empty past workday: always in this month and last month (the ones the filter shows), older months
-  // only from the day the file was imported (before that, a blank in an old month is left as the person had it)
-  const fillFrom = td.importDay ? fromIso(td.importDay) : null, recent = new Date(DAY.getFullYear(), DAY.getMonth() - 1, 1);
+  // every month of the sheet: 0 on an empty past workday (Mon-Fri), no 0 on weekends. Old months are not
+  // protected: the old files are archived (owner, 2026-11-26)
   bl.forEach((rows, mc) => {
     const mo = monthOf(mc), days = new Date(mo.getFullYear(), mo.getMonth() + 1, 0).getDate();
     rows.forEach(({ row, label }) => {
@@ -2117,8 +2116,8 @@ function fillStats(B, sheet) {
         if (kind.open) { const n = (td.openLog || {})[iso(date)]; if (v === "" && n) setCell(d, row, ref, "num", n[kind.open]); continue; }
         const n = (counted[mc + "|" + kind.key] || {})[day];
         if (n && n > (+v || 0)) setCell(d, row, ref, "num", n);
-        else if (!WORKDAYS.includes(date.getDay()) && date >= recent && v !== "" && +v === 0) setCell(d, row, ref, "num", "");   // a 0 left on a weekend by older versions
-        else if (v === "" && WORKDAYS.includes(date.getDay()) && (!fillFrom || date >= fillFrom || date >= recent)) setCell(d, row, ref, "num", 0);
+        else if (!WORKDAYS.includes(date.getDay()) && v !== "" && +v === 0) setCell(d, row, ref, "num", "");   // a 0 left on a weekend by older versions
+        else if (v === "" && WORKDAYS.includes(date.getDay())) setCell(d, row, ref, "num", 0);
       }
     });
   });
