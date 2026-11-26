@@ -78,6 +78,8 @@
   #newsList summary { cursor: pointer; }
   #newsList .d { color: var(--muted); margin-right: 8px; font-size: 13px; }
   #newsList pre { white-space: pre-wrap; margin: 4px 0 4px 20px; font: inherit; font-size: 13px; color: var(--muted); }
+  .line.jump { cursor: pointer; } .line.jump:hover { background: var(--calc); }
+  .focusbox { outline: 1px solid var(--ui); outline-offset: 3px; border-radius: 2px; }
   #impClients label.impc { display: block; font-size: 14px; cursor: pointer; }
   #impClients p { margin: 4px 0; font-size: 13px; color: var(--muted); }
   dialog textarea { width: 100%; height: 50vh; font: inherit; font-size: 14px; background: var(--bg); color: var(--ink); }
@@ -686,6 +688,7 @@ function renderPreview() {
     const plus = el("span", "addline", "＋"); plus.title = "在这行下面加一行自己的内容（每天都保留，按原样）";
     plus.addEventListener("click", ev => { ev.stopPropagation(); if (moving) moveExtra(l); else editExtra(d, null, l); });
     d.append(plus);
+    if (!l.extra) { d.classList.add("jump"); d.addEventListener("click", () => jumpTo(l.key)); }
     if (l.extra) {
       if (!l.bad) d.title = "自己加的行：点一下修改";
       if (moving === l.extra) d.classList.add("movingline");
@@ -764,8 +767,9 @@ function hoursSection() {
     cap.append(el("span", "hc", "类别"), el("span", "grow", "做了什么"), el("span", "hn", "小时"), el("span", "hn", "分钟"), el("span", "hs", "多/少一点"), el("span", "hx"));
     sec.append(cap);
   }
+  sec.dataset.k = "h:total";
   S.entries.forEach(e => {
-    const row = el("div", "hrow");
+    const row = el("div", "hrow"); row.dataset.k = "h:" + HOUR_LABELS[e.cat];
     const cat = el("select"); HOUR_LABELS.forEach((l, i) => opt(cat, i, l)); cat.value = e.cat;
     const text = el("input"); text.value = e.text; text.placeholder = "做了什么（如 淘图、MDC）";
     const h = el("select"); for (let i = 0; i <= 12; i++) opt(h, i, i);
@@ -813,7 +817,7 @@ const kindOf = k => (FIELD_HELP[k] || [])[2] || "";
 let EXAMPLE = null;   // the template's example values, shown in empty boxes
 function specFields(sec, spec) {
   EXAMPLE ||= seed().f;
-  const g = el("div", "fgroup");
+  const g = el("div", "fgroup"); g.dataset.k = (WEEKLY.includes(spec) ? "w:" : "d:") + spec[0];
   const fs = spec.filter(p => p.f), isShort = p => kindOf(p.f) === "n";
   [...fs.filter(isShort), ...fs.filter(p => !isShort(p))].forEach(p => {   // the number boxes side by side first
     const [label, hint, kind] = FIELD_HELP[p.f] || [p.f], short = kind === "n";
@@ -836,7 +840,7 @@ function specFields(sec, spec) {
 
 // one tracked item (持续关注, client, reminder)
 function itemCard(list, x, withCat) {
-  const card = el("div", "icard");
+  const card = el("div", "icard"); card.dataset.k = "i:" + x.id;
   const touch = () => { x.edited = today(); };
   const top = el("div", "irow");
   if (withCat) {
@@ -991,7 +995,7 @@ function clientsSection() {
   const paste = el("button", "", "粘贴系统数量"); paste.title = "把旧系统「客户总表」的数量（用书签「复制本页」复制），填进下面简称对得上的客户";
   paste.addEventListener("click", pasteClientNumbers);
   sys.append(paste, el("span", "hint", "数量不用手抄：在旧系统「客户总表」页面点书签「复制本页」，再回来按这里。"));
-  sec.append(sys);
+  sec.append(sys); sec.dataset.k = "c1:head";
   const dl = el("datalist"); dl.id = "roleList"; ["前", "前后", "后"].forEach(v => { const o = el("option"); o.value = v; dl.append(o); }); sec.append(dl);
   S.clients.forEach(c => {
     const card = el("div", "ccard");
@@ -1006,7 +1010,8 @@ function clientsSection() {
     head.append(name, role);
     card.append(head, delC);
     c.lines.forEach((l, i) => {
-      const pl = el("div", "pline");
+      // the journal's client line (简称 + first product line) = the whole client card; other product lines = their own box
+      const pl = el("div", "pline"); (i === 0 ? card : pl).dataset.k = "cl:" + l.id; pl.dataset.k2 = "cq:" + l.id;
       const r1 = el("div", "irow");
       const prod = el("input", "prod"); prod.value = l.product; prod.placeholder = "产品线（如 鞋1）";
       prod.addEventListener("input", () => { l.product = prod.value.trim(); changed(); });
@@ -1051,23 +1056,34 @@ function clientsSection() {
   sec.append(addButton("客户", () => { S.clients.push({ name: "", role: "前", lines: [{ product: "", qty: "", orders: {}, est: "", unshipped: "", items: [], stats: true }] }); renderForm(); changed(); }));
 }
 
+const keyed = (k, sec) => { sec.dataset.k = k; return sec; };
+// click a line of the journal text: the form scrolls to what makes that line, framed with a thin box
+function jumpTo(key) {
+  form.querySelectorAll(".focusbox").forEach(e => e.classList.remove("focusbox"));
+  const q = v => form.querySelectorAll('[data-k="' + CSS.escape(v) + '"], [data-k2="' + CSS.escape(v) + '"]');
+  let hit = [...q(key)];
+  if (!hit.length && key.startsWith("h:")) hit = [...q("h:total")];   // an hour type with no entry yet
+  if (!hit.length) return;
+  hit.forEach(e => { const d = e.closest("details"); if (d) d.open = true; e.classList.add("focusbox"); });
+  hit[0].scrollIntoView({ block: "center", behavior: "smooth" });
+}
 function renderForm() {
   const y = window.scrollY;
-  refreshers = []; form.innerHTML = "";
+  refreshers = []; form.innerHTML = ""; ensureIds();
   hoursSection();
 
-  const daily = section("今天的数字", "每天早上会清空，灰色字是上次写的。");
-  const auto = el("div", "fout"); auto.append("组内日常清单表（从日常清单自动来）→ ", calc(() => specText(DAILY[0]).t)); daily.append(auto);
-  if (DAILY[1].show()) { const b = el("div", "fout"); b.append("大老板的清单（从日常清单自动来）→ ", calc(() => specText(DAILY[1]).t)); daily.append(b); }
+  const daily = section("今天的数字", "每天早上会清空，灰色字是上次写的。"); daily.dataset.k = "daily:head";
+  const auto = el("div", "fout"); auto.dataset.k = "d:" + DAILY[0][0]; auto.append("组内日常清单表（从日常清单自动来）→ ", calc(() => specText(DAILY[0]).t)); daily.append(auto);
+  if (DAILY[1].show()) { const b = el("div", "fout"); b.dataset.k = "d:" + DAILY[1][0]; b.append("大老板的清单（从日常清单自动来）→ ", calc(() => specText(DAILY[1]).t)); daily.append(b); }
   DAILY.slice(1).filter(sp => !sp.auto).forEach(sp => specFields(daily, sp));
 
-  itemList(section("持续关注", "客诉、欠包装、测试未过、进度核对、船期预警、品质、会议等要跟踪的事。每条都要有计划日期（晚于今天）；今天改过的自动变 +。每条下面：入日志日期 → 计划日期。"), S.focus, true);
+  itemList(keyed("focus:head", section("持续关注", "客诉、欠包装、测试未过、进度核对、船期预警、品质、会议等要跟踪的事。每条都要有计划日期（晚于今天）；今天改过的自动变 +。每条下面：入日志日期 → 计划日期。")), S.focus, true);
   clientsSection();
-  itemList(section("C1无单老客 / C1新客", "以前下过单但近两年没单的客人，或新客。一旦下单，移到 C1有单老客。"), S.c1none, false);
-  itemList(section("C2目标客"), S.c2, false);
-  itemList(section("提醒", "如 W43 周一传未完日常清单表；新的一周第一天会自动换成新的周数。"), S.remind, false);
+  itemList(keyed("c1none:head", section("C1无单老客 / C1新客", "以前下过单但近两年没单的客人，或新客。一旦下单，移到 C1有单老客。")), S.c1none, false);
+  itemList(keyed("c2:head", section("C2目标客")), S.c2, false);
+  itemList(keyed("remind:head", section("提醒", "如 W43 周一传未完日常清单表；新的一周第一天会自动换成新的周数。")), S.remind, false);
 
-  const wk = el("details", "fsec"); wk.open = DAY.getDay() === 5;
+  const wk = el("details", "fsec"); wk.open = DAY.getDay() === 5; wk.dataset.k = "weekly:head";
   const sum = el("summary"); sum.append(el("b", "", "每周回顾"), "　上次更新 ", calc(() => mmdd(fromIso(S.weekDate))), "，每周五自动清空重写");
   wk.append(sum); form.append(wk);
   WEEKLY.forEach(sp => { const g = el("div", "wgroup"); g.append(el("div", "wtitle", sp[0].replace(/^\*|：$/g, ""))); specFields(g, sp); wk.append(g); });
