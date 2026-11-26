@@ -2025,108 +2025,9 @@ function statKind(label) {
   if (l.includes("汇总")) return { sum: l[0] };
   const s = STAT_ROWS.find(x => x[1] === l); return s ? { key: s[0] } : {};
 }
-function fillStats(B, sheet) {
-  const td = TD(), d = xml(B.text(sheet.file)), sd = d.getElementsByTagName("sheetData")[0];
-  const header = [...sd.getElementsByTagName("row")].find(r => r.getAttribute("r") === "1");
-  // counts of the items added here (an imported item is already counted in the file)
-  const counted = {};
-  td.items.forEach(x => {
-    if (x.imported) return;
-    const s = source(x.code), dt = codeDate(x); if (!s || !dt) return;
-    const k = monthCode(dt) + "|" + statRow(s); (counted[k] ||= {})[dt.getDate()] = (counted[k][dt.getDate()] || 0) + 1;
-  });
-  const blocks = () => {
-    const out = new Map();
-    [...sd.getElementsByTagName("row")].forEach(row => {
-      if (row === header) return;
-      const c = rowCells(row), mc = String(cellVal(B, c[2])).trim();
-      if (/^\d{5}$/.test(mc)) (out.get(mc) || out.set(mc, []).get(mc)).push({ row, label: String(cellVal(B, c[4])) });
-    });
-    return out;
-  };
-  let bl = blocks(), last = Math.max(1, ...rowMap(sd).keys());
-  const monthOf = mc => new Date(2000 + +mc.slice(1, 3), +mc.slice(3) - 1, 1);
-  const have = [...bl.keys()].sort(), want = Object.keys(counted).map(k => k.split("|")[0]).sort();
-  let m = have.length ? monthOf(have[have.length - 1]) : monthOf(want[0] || monthCode(DAY));
-  if (have.length) m = new Date(m.getFullYear(), m.getMonth() + 1, 1);
-  // new months: copy the newest month's rows (or the standard 8 rows), values cleared, sums rewritten
-  for (; m <= DAY; m = new Date(m.getFullYear(), m.getMonth() + 1, 1)) {
-    const prev = (have.length ? bl.get([...bl.keys()].sort().pop()) : STAT_ROWS.map(s => ({ row: header, label: s[1], fresh: true })))
-      .filter(p => hasBoss() || !/^B/.test(p.label.trim()));
-    const first = last + 1;
-    prev.forEach(p => {
-      const r = ++last, row = d.createElementNS(NS, "row"), src = rowCells(p.row), kind = statKind(p.label);
-      row.setAttribute("r", r);
-      ["s", "customFormat", "ht", "customHeight"].forEach(a => { if (!p.fresh && p.row.getAttribute(a)) row.setAttribute(a, p.row.getAttribute(a)); });
-      const st = k => src[k] && src[k].getAttribute("s");
-      const c3 = p.fresh ? 1 : cellVal(B, src[3]);
-      row.append(cell(d, "A" + r, st(1), "num", bizYear(m)), cell(d, "B" + r, st(2), "num", monthCode(m)));
-      row.append(cell(d, "C" + r, st(3), "num", kind.sum ? "" : c3));   // 汇总 rows get their sums below
-      row.append(cell(d, "D" + r, st(4), "str", p.label));
-      for (let day = 1; day <= 31; day++) row.append(cell(d, colName(DAY_COL(day)) + r, st(DAY_COL(day)), "num", ""));
-      const hadSum = p.fresh ? !kind.open : src[SUM_COL] && src[SUM_COL].getElementsByTagName("f").length;
-      if (hadSum) row.append(cell(d, "AJ" + r, st(SUM_COL), "f", `SUM(E${r}:AI${r})`));
-      // anything right of AJ (notes like 若无适合此行…) is copied as it was
-      Object.keys(src).map(Number).filter(k => k > SUM_COL).sort((a, b) => a - b).forEach(k => {
-        const e = src[k].cloneNode(true); e.setAttribute("r", colName(k) + r); e.getElementsByTagName("f").length || row.append(e);
-      });
-      sd.append(row);
-    });
-    // 汇总 rows: sum of the rows of the same letter just above them
-    for (let r = first; r <= last; r++) {
-      const row = rowMap(sd).get(r), label = String(cellVal(B, rowCells(row)[4])), kind = statKind(label);
-      if (!kind.sum) continue;
-      let top = r;
-      while (top - 1 >= first) {
-        const l = String(cellVal(B, rowCells(rowMap(sd).get(top - 1))[4])).trim();
-        if (l[0] !== kind.sum || l.includes("汇总") || l.includes("未完成")) break;
-        top--;
-      }
-      if (top === r) continue;
-      [3, ...Array.from({ length: 31 }, (_, i) => DAY_COL(i + 1)), SUM_COL].forEach(k => setCell(d, row, colName(k) + r, "f", `SUM(${colName(k)}${top}:${colName(k)}${r - 1})`));
-    }
-    bl = blocks(); have.push(monthCode(m));
-  }
-  // no 01间接上级 sheet: this month's B rows (older versions added them at the end of the sheet) are removed
-  if (!hasBoss()) {
-    for (let row = rowMap(sd).get(last); row && row !== header; row = rowMap(sd).get(last)) {
-      const c = rowCells(row);
-      if (String(cellVal(B, c[2])).trim() !== String(monthCode(DAY)) || !/^B/.test(String(cellVal(B, c[4])).trim())) break;
-      sd.removeChild(row); last--;
-    }
-    bl = blocks();
-  }
-  // write the numbers
-  const sumStyles = new Set([...sd.getElementsByTagName("c")].filter(e => e.getElementsByTagName("f").length && e.getAttribute("s")).map(e => e.getAttribute("s")));
-  // every month of the sheet: 0 on an empty past workday (Mon-Fri), no 0 on weekends. Old months are not
-  // protected: the old files are archived (owner, 2026-11-26)
-  bl.forEach((rows, mc) => {
-    const mo = monthOf(mc), days = new Date(mo.getFullYear(), mo.getMonth() + 1, 0).getDate();
-    rows.forEach(({ row, label }) => {
-      const kind = statKind(label), c = rowCells(row), r = row.getAttribute("r");
-      if (!kind.key && !kind.open) return;
-      // a day cell that an older version gave the green 汇总 style gets the row's own (most used) style back
-      const sty = Array.from({ length: 31 }, (_, i) => c[DAY_COL(i + 1)] && c[DAY_COL(i + 1)].getAttribute("s"));
-      const common = Object.entries(sty.reduce((a, v) => (v && (a[v] = (a[v] || 0) + 1), a), {})).sort((x, y) => y[1] - x[1])[0];
-      if (common) sty.forEach((v, i) => { if (v && v !== common[0] && sumStyles.has(v)) c[DAY_COL(i + 1)].setAttribute("s", common[0]); });
-      for (let day = 1; day <= days; day++) {
-        const date = new Date(mo.getFullYear(), mo.getMonth(), day); if (date > DAY) break;
-        const ref = colName(DAY_COL(day)) + r, cur = c[DAY_COL(day)], v = cellVal(B, cur);
-        if (cur && cur.getElementsByTagName("f").length) continue;
-        if (kind.open) { const n = (td.openLog || {})[iso(date)]; if (v === "" && n) setCell(d, row, ref, "num", n[kind.open]); continue; }
-        const n = (counted[mc + "|" + kind.key] || {})[day];
-        if (n && n > (+v || 0)) setCell(d, row, ref, "num", n);
-        else if (!WORKDAYS.includes(date.getDay()) && v !== "" && +v === 0) setCell(d, row, ref, "num", "");   // a 0 left on a weekend by older versions
-        else if (v === "" && WORKDAYS.includes(date.getDay())) setCell(d, row, ref, "num", 0);
-      }
-    });
-  });
-  const dim = d.getElementsByTagName("dimension")[0]; if (dim) dim.setAttribute("ref", dim.getAttribute("ref").replace(/\d+$/, last));
-  filterRecentMonths(B, sheet, d, sd, last);
-  B.put(sheet.file, xmlText(d));
-}
-
-// 02新增统计 for a list that never came from an imported Excel (built-in file): rebuilt, 8 rows per month (A/B x 单独/大群/小群 + 汇总), one column per day, sums as formulas
+// 02新增统计 is recounted from the task list on every download, nothing of the old sheet is kept but its look
+// (owner, 2026-11-26): 8 rows per month (A/B x 单独/大群/小群 + 汇总; only the 4 A rows without a 01间接上级 sheet),
+// one column per day, 0 on past Mon-Fri, Sat/Sun empty, sums as formulas (empty when the day has no numbers)
 function statValues() {
   const out = {}, td = TD();
   Object.entries(td.statsBase || {}).forEach(([k, days]) => { out[k] = { ...days }; });
@@ -2142,8 +2043,19 @@ function fillStatsRebuild(B, sheet) {
   const d = xml(B.text(sheet.file)), sd = d.getElementsByTagName("sheetData")[0];
   const rows = [...sd.getElementsByTagName("row")];
   const header = rows.find(r => r.getAttribute("r") === "1");
-  const tpl = k => rows.find(r => +r.getAttribute("r") === 2 + k) || rows.find(r => +r.getAttribute("r") === 2) || header;
-  const styles = STAT_ROWS.map((_, k) => ({ row: tpl(k), st: styleMap(tpl(k)) }));
+  const label = r => { const c = rowCells(r)[4]; return c ? String(cellVal(B, c)).trim() : ""; };
+  // the look of each kind of row comes from the first row with that label (else row 2)
+  const tpl = l => rows.find(r => r !== header && label(r) === l) || rows.find(r => +r.getAttribute("r") === 2) || header;
+  // every day cell of a row gets the style most of its day cells have (older versions left some without borders)
+  const look = t => {
+    const st = styleMap(t), n = {};
+    for (let day = 1; day <= 31; day++) { const v = st[4 + day]; if (v && v !== "0") n[v] = (n[v] || 0) + 1; }
+    const day = (Object.entries(n).sort((x, y) => y[1] - x[1])[0] || [])[0];
+    if (day) for (let k = 1; k <= 31; k++) st[4 + k] = day;
+    return st;
+  };
+  const defs = STAT_ROWS.filter(([key]) => hasBoss() || key[0] !== "B");
+  const styles = defs.map(([, l]) => ({ row: tpl(l), st: look(tpl(l)) }));
   rows.forEach(r => { if (r !== header) sd.removeChild(r); });
   const vals = statValues();
   // months: from the first one with data to this month
@@ -2152,7 +2064,7 @@ function fillStatsRebuild(B, sheet) {
   let r = 2;
   while (m <= DAY) {
     const mc = monthCode(m), days = new Date(m.getFullYear(), m.getMonth() + 1, 0).getDate();
-    STAT_ROWS.forEach(([key, label], k) => {
+    defs.forEach(([key, label], k) => {
       const { row: t, st } = styles[k], row = d.createElementNS(NS, "row"), sum = key.length === 1;
       row.setAttribute("r", r);
       ["s", "customFormat", "ht", "customHeight"].forEach(a => { if (t && t !== header && t.getAttribute(a)) row.setAttribute(a, t.getAttribute(a)); });
@@ -2161,7 +2073,7 @@ function fillStatsRebuild(B, sheet) {
         cell(d, "D" + r, st[4], "str", label));
       for (let day = 1; day <= 31; day++) {
         const col = colName(4 + day), date = new Date(m.getFullYear(), m.getMonth(), day);
-        if (sum) { row.append(cell(d, col + r, st[4 + day], "f", `SUM(${col}${r - 3}:${col}${r - 1})`)); continue; }
+        if (sum) { row.append(cell(d, col + r, st[4 + day], "f", `IF(COUNT(${col}${r - 3}:${col}${r - 1}),SUM(${col}${r - 3}:${col}${r - 1}),"")`)); continue; }
         const v = (vals[mc + "|" + key] || {})[day];
         const fill = day <= days && date <= DAY && WORKDAYS.includes(date.getDay());
         row.append(cell(d, col + r, st[4 + day], "num", v != null ? v : fill ? 0 : ""));
@@ -2235,7 +2147,7 @@ async function buildXlsx() {
     const sh = B.sheets.find(s => s.name === f.name);
     if (sh) fillInPlace(B, sh, td.items.filter(x => sheetOf(x) === f.name).sort(order), f.cols);
   });
-  if (B.stats) { if (td.templateId) fillStats(B, B.stats); else fillStatsRebuild(B, B.stats); }
+  if (B.stats) fillStatsRebuild(B, B.stats);
   // formulas changed: Excel recalculates on opening; the old calculation chain is dropped
   const calc = B.wb.getElementsByTagName("calcPr")[0]; if (calc) calc.setAttribute("fullCalcOnLoad", "1");
   B.put("xl/workbook.xml", xmlText(B.wb));
