@@ -35,6 +35,15 @@ exact format on the right, made from the form. 「复制日志」 copies that te
   line is gone, above the line that was below it; if both are gone, at the
   end of its section in red. 移 puts it under another line. Stored in
   `S.extra`.
+- **Import** (导入现有日志): marked lines (@ ▲ ● * + -) are read by their marker. In the
+  C1 block (no markers): a line with 双 = quantity line (read only in the page's own
+  wording, else kept as typed), 3 capitals in a row = client line (name = all before
+  前/后), else a product line. 检查 lists the client block's lines with a tick each
+  (ticked = client) to fix misreads. Unread lines are kept as own lines.
+- **Boss list**: items on 01间接上级 are counted on their own daily line under
+  组内日常清单表 (wording still to come), only when that list has items; the group
+  line counts 01直接上级 only.
+- **Click a journal line** to scroll the form to what makes it (thin blue box).
 - **最近更新** (top right): the last 20 commits of this repo, read from the
   GitHub API on click (needs internet), with a link to the commits page.
 - The fixed lines (labels, boxes, counts) are the `DAILY` / `WEEKLY` lists at

@@ -77,6 +77,10 @@
   #newsList summary { cursor: pointer; }
   #newsList .d { color: var(--muted); margin-right: 8px; font-size: 13px; }
   #newsList pre { white-space: pre-wrap; margin: 4px 0 4px 20px; font: inherit; font-size: 13px; color: var(--muted); }
+  .line.jump { cursor: pointer; } .line.jump:hover { background: var(--calc); }
+  .focusbox { outline: 1px solid var(--ui); outline-offset: 3px; border-radius: 2px; }
+  #impClients label.impc { display: block; font-size: 14px; cursor: pointer; }
+  #impClients p { margin: 4px 0; font-size: 13px; color: var(--muted); }
   dialog textarea { width: 100%; height: 50vh; font: inherit; font-size: 14px; background: var(--bg); color: var(--ink); }
   .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--paper);
     padding: 8px 18px; border-radius: 6px; opacity: 0; transition: opacity .2s; pointer-events: none; }
@@ -201,6 +205,13 @@
   .qlabel { font-size: 13px; font-weight: bold; }
   .num input.chg { outline: 2px solid var(--ui); }
   .sysrow { margin: 2px 0 8px; } .sysrow .hint { display: inline; margin: 0; }
+  /* narrow screens (phones): one column, the journal text under the form, nothing stuck to the top */
+  @media (max-width: 900px) {
+    .jgrid { grid-template-columns: minmax(0, 1fr); }
+    .prevwrap { position: static; max-height: none; }
+    .bar { position: static; }
+    dialog textarea { height: 35vh; }
+  }
   @media print { .bar, .ui, .add, details { display: none !important; } [contenteditable], .calc, select { background: none; border: 0; } }
 </style>
 </head>
@@ -265,6 +276,7 @@
   <p>把现有的日志文字整篇粘贴进来（规则部分可以不要），按“检查”。</p>
   <textarea id="impText"></textarea>
   <p><button id="impCheck">检查</button> <button id="impDo" disabled>导入</button> <button id="impClose">关闭</button></p>
+  <div id="impClients"></div>
   <pre id="impResult" style="white-space:pre-wrap"></pre>
 </dialog>
 <div class="toast" id="toast"></div>
@@ -306,6 +318,10 @@ const T = () => mmdd(DAY);
 // ---------- the fixed lines: text, {d} = journal date, {w} = weekly date, {f: box}, {c: automatic} ----------
 const DAILY = [
   ["*组内日常清单表：", { d: 1 }, "当天接收", { c: "tdIn" }, "，当天完成", { c: "tdDone" }, "，未结", { c: "tdOpen" }, "，传递：", { c: "tdSent" }],
+  // the big boss's own list (01间接上级), counted apart (owner, 2026-11-25); only for people who have items on it.
+  // WORDING NOT FINAL: the owner will give it
+  Object.assign(["*大老板日常清单表：", { d: 1 }, "当天接收", { c: "tdBIn" }, "，当天完成", { c: "tdBDone" }, "，未结", { c: "tdBOpen" }],
+    { auto: true, show: () => TD().items.some(x => sheetOf(x) === "indirect") }),
   ["*接单/出货系统更新：", { d: 1 }, { f: "d2" }],
   ["*在手需下样还未下样款数：", { d: 1 }, { f: "d3" }],
   ["*客户投诉：", { d: 1 }, "/", { f: "d4n" }, "条, 知会QC/QA：", { f: "d4q" }, "条；阿文确认收到：", { f: "d4c" }, "条，今入持续关注区登记客诉：", { c: "newComplaints" }, "条"],
@@ -535,6 +551,7 @@ function hoursTotal() { return sumOf(S.entries); }
 // The business year runs Nov-Oct; the page always shows last / this / next year, so the
 // "delete the year before last on 31 Oct" rule happens by itself.
 const QTY_RE = /\d{3}\s*(单|未出)|未出\s*\d|估\s*\d/;
+const QTY_OWN = /^(\d{3}单\d+双|\d{3}未出\d+双|未出\d+双|估\d+双)([；，;,](\d{3}单\d+双|\d{3}未出\d+双|未出\d+双|估\d+双))*$/;
 function migrateQty(l) {
   if (l.orders) return;
   l.orders = {}; l.est = ""; l.unshipped = "";
@@ -577,7 +594,11 @@ function qtyText(c, l) {
 // ---------- the journal text: one {t, bad} per line; bad = why the line still needs work ----------
 const LINE1 = "--------------------------------------------------------------------------------------";
 const LINE2 = "-----------------------------------------------------";
-function itemText(x, withCat) { return (x.edited === today() ? "+" : "-") + x.start + (withCat && x.cat ? x.cat + "：" : "") + x.text.trim() + x.plan; }
+function itemText(x, withCat) {
+  const body = (withCat && x.cat ? x.cat + "：" : "") + x.text.trim();
+  // "-1128 S27某项目": the space stays when the text starts with a letter or digit (else the date runs into it)
+  return (x.edited === today() ? "+" : "-") + x.start + (x.start && /^[A-Za-z0-9]/.test(body) ? " " : "") + body + x.plan;
+}
 function itemBad(x) { return !x.text.trim() ? "事项没写内容" : planOk(x) ? "" : "计划日期要晚于今天"; }
 function specText(spec) {
   let bad = "";
@@ -604,7 +625,7 @@ function genLines() {
   HOUR_LABELS.forEach((label, i) => { const es = S.entries.filter(e => e.cat === i), n = noteOf(es); add("@" + label + (sumOf(es) || "0h") + (n ? "（" + n + "）" : ""), "", false, "h:" + label); });
   add("@总计" + hoursTotal(), S.entries.length ? "" : "今日工时还没填", false, "h:total");
   sec = "daily"; add("▲每日回顾：", "", false, "daily:head");
-  DAILY.forEach(sp => { const r = specText(sp); add(r.t, r.bad, false, "d:" + sp[0]); });
+  DAILY.filter(sp => !sp.show || sp.show()).forEach(sp => { const r = specText(sp); add(r.t, r.bad, false, "d:" + sp[0]); });
   sec = "remind"; add("▲提醒：本周第" + isoWeek(DAY) + "周", "", false, "remind:head");
   items(S.remind, false);
   sec = "focus"; add("▲持续关注(客户工厂投诉/欠包装/测试未过/进度核对/船期预警/品质难点/会议/其他等跟踪)：", "", false, "focus:head");
@@ -616,7 +637,7 @@ function genLines() {
   S.clients.forEach(c => c.lines.forEach((l, i) => {
     const lonely = isFront(c.role) && /前/.test(c.role) && !l.items.filter(alive).length ? "前道每条产品线至少要一条跟踪事项" : "";
     // the space between 简称+前/后 and the product line stays: it separates the two (as in the template "ABC1前 鞋1")
-    add((i === 0 ? tight(c.name + c.role) + " " : "") + tight(l.product), i === 0 && !c.name ? "客户简称没填" : lonely, true, "cl:" + l.id);
+    add((i === 0 ? tight(c.name + c.role) + (l.product.trim() ? " " : "") : "") + tight(l.product), i === 0 && !c.name ? "客户简称没填" : lonely, true, "cl:" + l.id);
     const q = qtyText(c, l); if (q) add(q, "", false, "cq:" + l.id);
     items(l.items, false);
   }));
@@ -666,6 +687,7 @@ function renderPreview() {
     const plus = el("span", "addline", "＋"); plus.title = "在这行下面加一行自己的内容（每天都保留，按原样）";
     plus.addEventListener("click", ev => { ev.stopPropagation(); if (moving) moveExtra(l); else editExtra(d, null, l); });
     d.append(plus);
+    if (!l.extra) { d.classList.add("jump"); d.addEventListener("click", () => jumpTo(l.key)); }
     if (l.extra) {
       if (!l.bad) d.title = "自己加的行：点一下修改";
       if (moving === l.extra) d.classList.add("movingline");
@@ -744,8 +766,9 @@ function hoursSection() {
     cap.append(el("span", "hc", "类别"), el("span", "grow", "做了什么"), el("span", "hn", "小时"), el("span", "hn", "分钟"), el("span", "hs", "多/少一点"), el("span", "hx"));
     sec.append(cap);
   }
+  sec.dataset.k = "h:total";
   S.entries.forEach(e => {
-    const row = el("div", "hrow");
+    const row = el("div", "hrow"); row.dataset.k = "h:" + HOUR_LABELS[e.cat];
     const cat = el("select"); HOUR_LABELS.forEach((l, i) => opt(cat, i, l)); cat.value = e.cat;
     const text = el("input"); text.value = e.text; text.placeholder = "做了什么（如 淘图、MDC）";
     const h = el("select"); for (let i = 0; i <= 12; i++) opt(h, i, i);
@@ -793,7 +816,7 @@ const kindOf = k => (FIELD_HELP[k] || [])[2] || "";
 let EXAMPLE = null;   // the template's example values, shown in empty boxes
 function specFields(sec, spec) {
   EXAMPLE ||= seed().f;
-  const g = el("div", "fgroup");
+  const g = el("div", "fgroup"); g.dataset.k = (WEEKLY.includes(spec) ? "w:" : "d:") + spec[0];
   const fs = spec.filter(p => p.f), isShort = p => kindOf(p.f) === "n";
   [...fs.filter(isShort), ...fs.filter(p => !isShort(p))].forEach(p => {   // the number boxes side by side first
     const [label, hint, kind] = FIELD_HELP[p.f] || [p.f], short = kind === "n";
@@ -816,7 +839,7 @@ function specFields(sec, spec) {
 
 // one tracked item (持续关注, client, reminder)
 function itemCard(list, x, withCat) {
-  const card = el("div", "icard");
+  const card = el("div", "icard"); card.dataset.k = "i:" + x.id;
   const touch = () => { x.edited = today(); };
   const top = el("div", "irow");
   if (withCat) {
@@ -971,7 +994,7 @@ function clientsSection() {
   const paste = el("button", "", "粘贴系统数量"); paste.title = "把旧系统「客户总表」的数量（用书签「复制本页」复制），填进下面简称对得上的客户";
   paste.addEventListener("click", pasteClientNumbers);
   sys.append(paste, el("span", "hint", "数量不用手抄：在旧系统「客户总表」页面点书签「复制本页」，再回来按这里。"));
-  sec.append(sys);
+  sec.append(sys); sec.dataset.k = "c1:head";
   const dl = el("datalist"); dl.id = "roleList"; ["前", "前后", "后"].forEach(v => { const o = el("option"); o.value = v; dl.append(o); }); sec.append(dl);
   S.clients.forEach(c => {
     const card = el("div", "ccard");
@@ -986,7 +1009,8 @@ function clientsSection() {
     head.append(name, role);
     card.append(head, delC);
     c.lines.forEach((l, i) => {
-      const pl = el("div", "pline");
+      // the journal's client line (简称 + first product line) = the whole client card; other product lines = their own box
+      const pl = el("div", "pline"); (i === 0 ? card : pl).dataset.k = "cl:" + l.id; pl.dataset.k2 = "cq:" + l.id;
       const r1 = el("div", "irow");
       const prod = el("input", "prod"); prod.value = l.product; prod.placeholder = "产品线（如 鞋1）";
       prod.addEventListener("input", () => { l.product = prod.value.trim(); changed(); });
@@ -1031,22 +1055,34 @@ function clientsSection() {
   sec.append(addButton("客户", () => { S.clients.push({ name: "", role: "前", lines: [{ product: "", qty: "", orders: {}, est: "", unshipped: "", items: [], stats: true }] }); renderForm(); changed(); }));
 }
 
+const keyed = (k, sec) => { sec.dataset.k = k; return sec; };
+// click a line of the journal text: the form scrolls to what makes that line, framed with a thin box
+function jumpTo(key) {
+  form.querySelectorAll(".focusbox").forEach(e => e.classList.remove("focusbox"));
+  const q = v => form.querySelectorAll('[data-k="' + CSS.escape(v) + '"], [data-k2="' + CSS.escape(v) + '"]');
+  let hit = [...q(key)];
+  if (!hit.length && key.startsWith("h:")) hit = [...q("h:total")];   // an hour type with no entry yet
+  if (!hit.length) return;
+  hit.forEach(e => { const d = e.closest("details"); if (d) d.open = true; e.classList.add("focusbox"); });
+  hit[0].scrollIntoView({ block: "center", behavior: "smooth" });
+}
 function renderForm() {
   const y = window.scrollY;
-  refreshers = []; form.innerHTML = "";
+  refreshers = []; form.innerHTML = ""; ensureIds();
   hoursSection();
 
-  const daily = section("今天的数字", "每天早上会清空，灰色字是上次写的。");
-  const auto = el("div", "fout"); auto.append("组内日常清单表（从日常清单自动来）→ ", calc(() => specText(DAILY[0]).t)); daily.append(auto);
-  DAILY.slice(1).forEach(sp => specFields(daily, sp));
+  const daily = section("今天的数字", "每天早上会清空，灰色字是上次写的。"); daily.dataset.k = "daily:head";
+  const auto = el("div", "fout"); auto.dataset.k = "d:" + DAILY[0][0]; auto.append("组内日常清单表（从日常清单自动来）→ ", calc(() => specText(DAILY[0]).t)); daily.append(auto);
+  if (DAILY[1].show()) { const b = el("div", "fout"); b.dataset.k = "d:" + DAILY[1][0]; b.append("大老板的清单（从日常清单自动来）→ ", calc(() => specText(DAILY[1]).t)); daily.append(b); }
+  DAILY.slice(1).filter(sp => !sp.auto).forEach(sp => specFields(daily, sp));
 
-  itemList(section("持续关注", "客诉、欠包装、测试未过、进度核对、船期预警、品质、会议等要跟踪的事。每条都要有计划日期（晚于今天）；今天改过的自动变 +。每条下面：入日志日期 → 计划日期。"), S.focus, true);
+  itemList(keyed("focus:head", section("持续关注", "客诉、欠包装、测试未过、进度核对、船期预警、品质、会议等要跟踪的事。每条都要有计划日期（晚于今天）；今天改过的自动变 +。每条下面：入日志日期 → 计划日期。")), S.focus, true);
   clientsSection();
-  itemList(section("C1无单老客 / C1新客", "以前下过单但近两年没单的客人，或新客。一旦下单，移到 C1有单老客。"), S.c1none, false);
-  itemList(section("C2目标客"), S.c2, false);
-  itemList(section("提醒", "如 W43 周一传未完日常清单表；新的一周第一天会自动换成新的周数。"), S.remind, false);
+  itemList(keyed("c1none:head", section("C1无单老客 / C1新客", "以前下过单但近两年没单的客人，或新客。一旦下单，移到 C1有单老客。")), S.c1none, false);
+  itemList(keyed("c2:head", section("C2目标客")), S.c2, false);
+  itemList(keyed("remind:head", section("提醒", "如 W43 周一传未完日常清单表；新的一周第一天会自动换成新的周数。")), S.remind, false);
 
-  const wk = el("details", "fsec"); wk.open = DAY.getDay() === 5;
+  const wk = el("details", "fsec"); wk.open = DAY.getDay() === 5; wk.dataset.k = "weekly:head";
   const sum = el("summary"); sum.append(el("b", "", "每周回顾"), "　上次更新 ", calc(() => mmdd(fromIso(S.weekDate))), "，每周五自动清空重写");
   wk.append(sum); form.append(wk);
   WEEKLY.forEach(sp => { const g = el("div", "wgroup"); g.append(el("div", "wtitle", sp[0].replace(/^\*|：$/g, ""))); specFields(g, sp); wk.append(g); });
@@ -1108,8 +1144,9 @@ function parseItem(t, withCat) {
   const plan = (m[3] || "").toUpperCase();
   return { start: m[1] || "", cat, text, plan, edited: "", closed: plan === "X" ? today() : "" };
 }
-function parseJournal(raw) {
-  const s = blank(), missed = [];
+// mark = { line number: true/false } from the client ticks in the import dialog (overrides the 3-capitals rule)
+function parseJournal(raw, mark = {}) {
+  const s = blank(), missed = [], c1 = [];   // c1 = the unmarked lines of the client block, for the ticks
   let sec = "", client = null, pl = null, read = 0;
   // a line it can't read becomes one of your own lines (S.extra), under the last line it did read (owner, 2026-11-25)
   s.extra = [];
@@ -1119,8 +1156,8 @@ function parseJournal(raw) {
   let raw0 = "";
   const miss = () => { missed.push(raw0.trim()); const x = { id: newId(), after: chain ? "x:" + chain : anchor, sec: asec, text: raw0 }; s.extra.push(x); chain = x.id; };
   const lines = raw.split(/\r?\n/).map(l => l.replace(/\s+$/, "")).filter(l => l.trim());
-  for (let t of lines) {
-    raw0 = t; t = t.trim();
+  for (const [n, line] of lines.entries()) {
+    let t = line; raw0 = t; t = t.trim();
     if (/^(规则|备忘|●备忘)|^——/.test(t) || /^●\s*备忘/.test(t)) { if (/规则/.test(t)) break; sec = "skip"; continue; }
     if (/^-{5,}/.test(t)) continue;
     if (/^\d*\s*@/.test(t)) {
@@ -1159,15 +1196,27 @@ function parseJournal(raw) {
       continue;
     }
     if (sec === "clients") {
-      const h = t.match(/^([A-Za-z0-9]+)\s*(前后|前|后)\s*(.*)$/);
-      if (h) { client = { name: h[1], role: h[2], lines: [] }; s.clients.push(client); pl = { id: newId(), product: h[3], qty: "", items: [] }; client.lines.push(pl); read++; seen("cl:" + pl.id); continue; }
-      if (client && pl && !pl.qty && !pl.items.length) { pl.qty = t; read++; seen("cq:" + pl.id); continue; }
-      if (client && pl && QTY_RE.test(t)) { pl.qty += "；" + t; read++; seen("cq:" + pl.id); continue; }
-      if (client) { pl = { id: newId(), product: t, qty: "", items: [] }; client.lines.push(pl); read++; seen("cl:" + pl.id); continue; }
+      // the client block is the only part without markers (owner, 2026-11-25):
+      // a line with 双 = quantity line; a line with 3 capitals in a row = client header; any other short line = product line
+      if (/\d\s*双/.test(t)) {
+        // read only when written exactly as the page writes it ("226单5000双，估4000双"); other wordings stay as typed
+        if (client && pl && QTY_OWN.test(tight(t))) { pl.qty = (pl.qty ? pl.qty + "；" : "") + t; read++; seen("cq:" + pl.id); continue; }
+        miss(); continue;
+      }
+      const isClient = n in mark ? mark[n] : /[A-Z]{3}/.test(t);
+      c1.push({ n, t, isClient });
+      if (isClient) {
+        // 简称 = everything before 前/后 ("ABC1/ABCB前 鞋1", "ABC1-ABCB 前", "ABC:前 鞋2"); no 前/后: the first word
+        const r = t.match(/^(.+?)\s*(前后|前|后)\s*(.*)$/), w = t.match(/^(\S+)\s*(.*)$/);
+        const [name, role, product] = r ? [r[1], r[2], r[3]] : [w[1], "", w[2]];
+        client = { name: name.trim(), role, lines: [] }; s.clients.push(client);
+        pl = { id: newId(), product: product.trim(), qty: "", items: [] }; client.lines.push(pl); read++; seen("cl:" + pl.id); continue;
+      }
+      if (client && t.length <= 20) { pl = { id: newId(), product: t, qty: "", items: [] }; client.lines.push(pl); read++; seen("cl:" + pl.id); continue; }
     }
     miss();
   }
-  return { s, missed, read };
+  return { s, missed, read, c1 };
 }
 
 // ---------- toolbar ----------
@@ -1230,14 +1279,31 @@ document.getElementById("news").addEventListener("click", async () => {
 const impDlg = document.getElementById("impDlg"), impText = document.getElementById("impText"),
   impResult = document.getElementById("impResult"), impDo = document.getElementById("impDo");
 let parsed = null;
-document.getElementById("imp").addEventListener("click", () => { impResult.textContent = ""; impDo.disabled = true; impDlg.showModal(); });
+document.getElementById("imp").addEventListener("click", () => { impResult.textContent = ""; document.getElementById("impClients").innerHTML = ""; impMark = {}; impDo.disabled = true; impDlg.showModal(); });
 document.getElementById("impClose").addEventListener("click", () => impDlg.close());
-document.getElementById("impCheck").addEventListener("click", () => {
-  parsed = parseJournal(impText.value);
-  impResult.textContent = "读懂了 " + parsed.read + " 行。" +
+// the client block's unmarked lines with a tick each: ticked = a client line (简称 before 前/后), else a product line
+let impMark = {};
+impText.addEventListener("input", () => { impMark = {}; impDo.disabled = true; });
+function showImpClients() {
+  const box = document.getElementById("impClients"); box.innerHTML = "";
+  if (!parsed.c1.length) return;
+  box.append(el("p", "", "C1有单老客：勾上的是客户行（简称写在前/后前面，如 ABC1前 鞋1），没勾的是产品线。读错了就点一下改。"));
+  parsed.c1.forEach(r => {
+    const lab = el("label", "impc"), cb = el("input"); cb.type = "checkbox"; cb.checked = r.isClient;
+    lab.title = "勾上 = 这一行是一个客户（简称 + 前/后 + 产品线）；不勾 = 上面那个客户的另一条产品线";
+    cb.addEventListener("change", () => { impMark[r.n] = cb.checked; check(); });
+    lab.append(cb, " " + r.t); box.append(lab);
+  });
+}
+document.getElementById("impCheck").addEventListener("click", () => check());
+function check() {
+  parsed = parseJournal(impText.value, impMark);
+  showImpClients();
+  const cl = parsed.s.clients.map(c => c.name + (c.role ? "（" + c.role + "）" : ""));
+  impResult.textContent = "读懂了 " + parsed.read + " 行。" + (cl.length ? "C1有单老客 " + cl.length + " 个：" + cl.join("、") + "。" : "C1有单老客：一个也没读到。") +
     (parsed.missed.length ? "\n下面 " + parsed.missed.length + " 行没读懂：导入后照原样放在原来的位置，作为自己加的行（蓝色，可以改或删）：\n" + parsed.missed.join("\n") : "全部读懂。");
   impDo.disabled = parsed.read === 0;
-});
+}
 impDo.addEventListener("click", () => {
   if (!parsed || !confirm("用这份日志替换页面上现在的内容？")) return;
   const keep = { archive: S.archive, todo: S.todo, evals: S.evals }; S = parsed.s; Object.assign(S, keep);   // own lines: the imported ones
@@ -1405,8 +1471,10 @@ function duty(x) {
   return p;
 }
 // numbers for the journal's 组内日常清单表 line
+// tdIn/tdDone/tdOpen = 01直接上级 (the group list); tdBIn/tdBDone/tdBOpen = 01间接上级 (the big boss's list)
 function todoCount(k) {
-  const it = TD().items.filter(x => !isF(x));
+  const boss = /^tdB/.test(k); k = k.replace(/^tdB/, "td");
+  const it = TD().items.filter(x => sheetOf(x) === (boss ? "indirect" : "direct"));
   if (k === "tdIn") return it.filter(x => x.got === today()).length;
   if (k === "tdDone") return it.filter(x => x.xDate === today()).length;
   if (k === "tdOpen") return it.filter(x => status(x) !== "OK").length;
@@ -1531,7 +1599,8 @@ function renderCols() {
 }
 function showCounts() {
   const c = document.getElementById("todoCounts");
-  if (c) c.textContent = `未结 ${todoCount("tdOpen")} · 今天收到 ${todoCount("tdIn")} · 今天完成 ${todoCount("tdDone")} · 传递：${todoCount("tdSent")}`;
+  if (c) c.textContent = `直接上级：未结 ${todoCount("tdOpen")} · 今天收到 ${todoCount("tdIn")} · 今天完成 ${todoCount("tdDone")}` +
+    (DAILY[1].show() ? `　大老板：未结 ${todoCount("tdBOpen")} · 今天收到 ${todoCount("tdBIn")} · 今天完成 ${todoCount("tdBDone")}` : "") + ` · 传递：${todoCount("tdSent")}`;
 }
 // open items per list per day, for the 未完成 rows of 02新增统计
 function logOpen() {
