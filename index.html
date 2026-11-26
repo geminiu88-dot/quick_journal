@@ -329,7 +329,7 @@ const DAILY = [
   // the big boss's own list (01间接上级), counted apart (owner, 2026-11-25); only for people who have items on it.
   // wording from the owner (2026-11-26): "*老板日常清单表：1125当天接收0，当天完成0，未结6，传递：无传"
   Object.assign(["*老板日常清单表：", { d: 1 }, "当天接收", { c: "tdBIn" }, "，当天完成", { c: "tdBDone" }, "，未结", { c: "tdBOpen" }, "，传递：", { c: "tdBSent" }],
-    { auto: true, show: () => TD().items.some(x => sheetOf(x) === "indirect") }),
+    { auto: true, show: () => hasBoss() && TD().items.some(x => sheetOf(x) === "indirect") }),
   ["*接单/出货系统更新：", { d: 1 }, { f: "d2" }],
   ["*在手需下样还未下样款数：", { d: 1 }, { f: "d3" }],
   ["*客户投诉：", { d: 1 }, "/", { f: "d4n" }, "条, 知会QC/QA：", { f: "d4q" }, "条；阿文确认收到：", { f: "d4c" }, "条，今入持续关注区登记客诉：", { c: "newComplaints" }, "条"],
@@ -885,14 +885,7 @@ function itemCard(list, x, withCat) {
   const plan = el("input", "short"); plan.inputMode = "numeric"; plan.maxLength = 4; plan.placeholder = "计划MMDD";
   plan.title = "计划日期：4位数字，如 1130（要晚于今天）"; plan.value = x.plan === "X" ? "" : x.plan;
   const said = el("span", "pdate");
-  const sayDate = () => {
-    const v = plan.value.trim(), d = mmddToDate(v, DAY), ok = d && d.getDate() === +v.slice(2);
-    const days = ok ? Math.round((d - DAY) / 864e5) : 0;
-    said.textContent = !v ? "" : !/^\d{4}$/.test(v) ? "要4位数字，如 1130" : !ok ? "没有这一天" :
-      (d.getMonth() + 1) + "月" + d.getDate() + "日 周" + "日一二三四五六"[d.getDay()] + (days > 0 ? "，还有" + days + "天" : "，要晚于今天");
-    said.classList.toggle("bad", !!v && !(ok && days > 0));
-    return ok ? v : "";
-  };
+  const sayDate = () => sayPlan(plan.value, said);
   sayDate();
   plan.addEventListener("input", () => { const v = sayDate(); if (v) { x.plan = v; x.closed = ""; touch(); changed(); } });
   const upd = el("button", "", "今日更新");
@@ -1444,7 +1437,9 @@ const CODE_FIND = /(\d{4})([A-Za-z]?)-(\d{1,3})(?!\d)/g;
 const CODE_RE = /^(\d{4})([A-Z]?)-(\d{1,3})$/;
 const STAT_ROWS = [["A1", "A来自直接上级-单独通知"], ["A2", "A来自直接上级-全组大群通知"], ["A3", "A来自直接上级-组内组小群通知"], ["A", "A来自直接上级-汇总"],
   ["B1", "B来自间接上级-单独通知"], ["B2", "B来自间接上级-全组大群通知"], ["B3", "B来自间接上级-组内组小群通知"], ["B", "B来自间接上级-汇总"]];
-const WORKDAYS = [1, 2, 3, 4, 5, 6];   // Mon..Sat get a number in 02新增统计 (0 when nothing came in)
+// without a 01间接上级 sheet there are no B (间接上级) rows: a code with no letter counts as A1 单独通知
+const statRow = src => !hasBoss() && /^B/.test(src.row) ? "A" + src.row.slice(1) : src.row;
+const WORKDAYS = [1, 2, 3, 4, 5];   // Mon..Fri get a number in 02新增统计 (0 when nothing came in); Sat/Sun stay empty (owner, 2026-11-26)
 const TEMPLATE_KEY = "journal-xlsx-template";
 // the parts an Excel part points to (its .rels file), and a target path made absolute
 function partRels(B, file) { const r = file.replace(/([^/]+)$/, "_rels/$1.rels"); return B.get(r) ? [...xml(B.text(r)).getElementsByTagName("Relationship")] : []; }
@@ -1465,7 +1460,9 @@ function sheetComments(B, sheet) {
 const LISTS = { direct: "直接上级", indirect: "间接上级 · 大老板" };
 
 // which sheet an item goes on: the sheet it was imported from, else by its letter
-function sheetOf(x) { return x.sheet || (source(x.code) || {}).sheet || "direct"; }
+// a file without a 01间接上级 sheet has no big-boss list: those items go on 01直接上级 (owner, 2026-11-26)
+const hasBoss = () => TD().hasBoss !== false;
+function sheetOf(x) { const sh = x.sheet || (source(x.code) || {}).sheet || "direct"; return sh === "indirect" && !hasBoss() ? "direct" : sh; }
 const isF = x => !LISTS[sheetOf(x)];
 function TD() {
   if (!S.todo) S.todo = { items: [], sends: [], statsBase: {} };
@@ -1514,6 +1511,7 @@ function slips(x) {
   if (!isF(x) && !x.desc.trim()) p.push("没有描述");
   // a "见批注" line points at an Excel comment (shown on the card): not a slip
   if (noteLines(x).some(l => !/^\d{4}/.test(l) && !l.includes("见批注"))) p.push("备注每行要以日期开头");
+  if (!isF(x) && status(x) !== "OK" && !linePlan(lastLine(x))) p.push("最后一行末尾要写计划日期");
   return p;
 }
 // F sheets say in their name which weekdays they are reviewed: F1立体模具缝周1周4 = Monday and Thursday
@@ -1579,7 +1577,7 @@ const todoEl = document.getElementById("todo");
 let search = "", openFolds = {};
 const FOLD_STEP = 30;
 function columns() {
-  const td = TD(), keys = Object.keys(LISTS);
+  const td = TD(), keys = Object.keys(LISTS).filter(k => k !== "indirect" || hasBoss());
   (td.fsheets || []).forEach(f => { if (td.items.some(x => sheetOf(x) === f.name)) keys.push(f.name); });
   return keys;
 }
@@ -1610,7 +1608,7 @@ function renderTodo() {
       // the same code from an earlier year is a different item: compare the dates too
       const d = pastDate(m.code.slice(0, 4), DAY);
       if (m.code && td.items.some(x => x.code.trim().toUpperCase() === m.code && +codeDate(x) === +d)) { dup.push(m.code); return; }
-      td.items.push({ code: m.code, desc: m.desc, notes: T(), xDate: "", sent: 0, okSent: false, got: today() }); added++;
+      td.items.push({ code: m.code, desc: m.desc, notes: T() + "已查收", xDate: "", sent: 0, okSent: false, got: today() }); added++;   // first action line: received (owner, 2026-11-26)
     });
     ta.value = ""; save(); renderTodo(); refresh();
     toast("加入 " + added + " 条" + (dup.length ? "；已在清单里：" + dup.join("，") : ""));
@@ -1707,6 +1705,19 @@ async function loadImages() {
   } catch (e) { IMAGES = {}; }
   imagesLoading = false;
 }
+// a plan date box (4 digits, MMDD) spells out the date it means next to it, to check (owner, 2026-11-26);
+// returns the date when it is a real day, else ""
+function sayPlan(value, said) {
+  const v = value.trim(), d = mmddToDate(v, DAY), ok = d && d.getDate() === +v.slice(2);
+  const days = ok ? Math.round((d - DAY) / 864e5) : 0;
+  said.textContent = !v ? "" : !/^\d{4}$/.test(v) ? "要4位数字，如 1130" : !ok ? "没有这一天" :
+    (d.getMonth() + 1) + "月" + d.getDate() + "日 周" + "日一二三四五六"[d.getDay()] + (days > 0 ? "，还有" + days + "天" : "，要晚于今天");
+  said.classList.toggle("bad", !!v && !(ok && days > 0));
+  return ok ? v : "";
+}
+// the last record line: its date at the start, the plan date at the end ("1126已查收，等回复1130"), X when closed
+function lastLine(x) { const ls = noteLines(x); return ls[ls.length - 1] || ""; }
+function linePlan(l) { const m = l.length >= 8 && l.match(/^\d{4}.*?(\d{4})$/); return m ? m[1] : ""; }
 function card(x) {
   const td = TD(), box = el("div", "card"), f = isF(x);
   const top = el("div", "cardtop");
@@ -1736,7 +1747,25 @@ function card(x) {
   const upd = el("button", "", "今日更新");
   const done = el("button", "", "收官 X");
   const prob = el("span", "prob");
-  btns.append(upd, done, prob);
+  // same bar as the journal: last line's date -> plan date at the end of the last line (owner, 2026-11-26)
+  const from = el("span", "legend"), closedX = el("b", "", "X");
+  const plan = el("input", "short"); plan.inputMode = "numeric"; plan.maxLength = 4; plan.placeholder = "计划MMDD";
+  plan.title = "计划日期：写在最后一行末尾，4位数字，如 1130（要晚于今天）";
+  const said = el("span", "pdate");
+  const bar = () => {
+    const l = lastLine(x), shut = /[Xx]$/.test(l);
+    from.textContent = /^\d{4}/.test(l) ? l.slice(0, 4) : "—";
+    plan.hidden = said.hidden = shut; closedX.hidden = !shut;
+    if (document.activeElement !== plan) plan.value = linePlan(l);
+    sayPlan(plan.value, said);
+  };
+  plan.addEventListener("input", () => {
+    const v = sayPlan(plan.value, said); if (!v) return;
+    const ls = x.notes.replace(/\s+$/, "").split("\n"), l = ls[ls.length - 1].trim();
+    ls[ls.length - 1] = !l ? T() + v : linePlan(l) ? l.slice(0, -4) + v : l + v;
+    x.notes = ls.join("\n"); x.keptOk = false; paint(); changedItem();
+  });
+  btns.append(from, el("span", "arrow", "→"), plan, said, closedX, upd, done, prob);
   if (x.comment) { const c = el("details", "cmt"); c.append(el("summary", "", "Excel 批注"), el("pre", "", x.comment)); box.append(c); }
   box.append(older, notes, btns);
 
@@ -1745,7 +1774,7 @@ function card(x) {
     const ls = x.notes.replace(/\s+$/, "").split("\n"), k = expanded ? 0 : Math.max(0, ls.length - SHOW_LINES);
     hidden = ls.slice(0, k); notes.value = ls.slice(k).join("\n");
     older.textContent = expanded ? "▲ 收起" : "▼ 展开更早的 " + hidden.length + " 条记录";
-    older.hidden = !expanded && !hidden.length; fit();
+    older.hidden = !expanded && !hidden.length; fit(); bar();
   };
   older.addEventListener("click", () => { expanded = !expanded; paint(); });
   const show = () => {
@@ -1759,7 +1788,7 @@ function card(x) {
   code.addEventListener("input", () => { x.code = code.textContent.trim().toUpperCase(); changedItem(); });
   desc.addEventListener("input", () => { x.desc = desc.textContent; changedItem(); });
   [code, desc].forEach(e => e.addEventListener("keydown", ev => { if (ev.key === "Enter") { ev.preventDefault(); e.blur(); } }));
-  notes.addEventListener("input", () => { x.notes = [...hidden, notes.value].join("\n"); x.keptOk = false; fit(); changedItem(); });
+  notes.addEventListener("input", () => { x.notes = [...hidden, notes.value].join("\n"); x.keptOk = false; fit(); bar(); changedItem(); });
   const appendLine = s => { x.notes = x.notes.replace(/\s+$/, "") + (x.notes.trim() ? "\n" : "") + s; x.keptOk = false; paint(); changedItem(); };
   upd.addEventListener("click", () => {
     const ls = noteLines(x);
@@ -1886,11 +1915,12 @@ const AFTER_FILTER = ["sortState", "dataConsolidate", "customSheetViews", "merge
 // An imported Excel is changed in place: its rows stay where they are (so comments, pictures and
 // hidden rows stay right), only rows edited here are rewritten, new items go at the bottom.
 function rowMap(sd) { return new Map([...sd.getElementsByTagName("row")].map(r => [+r.getAttribute("r"), r])); }
-// a cell the file doesn't have yet takes the style (borders, date format) of the same column in the rows above
+// a cell the file doesn't have yet takes the style (borders, date format) of the same column in the rows above;
+// cells with a formula (the green 汇总 rows of 02新增统计) are skipped, their colour isn't for plain numbers
 function styleAbove(row, col) {
   for (let r = row.previousElementSibling, n = 0; r && n < 300; r = r.previousElementSibling, n++) {
     const c = [...r.getElementsByTagName("c")].find(c => colNum(c.getAttribute("r")) === col);
-    if (c && c.getAttribute("s") && r.getAttribute("r") !== "1") return c.getAttribute("s");
+    if (c && c.getAttribute("s") && r.getAttribute("r") !== "1" && !c.getElementsByTagName("f").length) return c.getAttribute("s");
   }
   return null;
 }
@@ -2019,98 +2049,16 @@ function statKind(label) {
   if (l.includes("汇总")) return { sum: l[0] };
   const s = STAT_ROWS.find(x => x[1] === l); return s ? { key: s[0] } : {};
 }
-function fillStats(B, sheet) {
-  const td = TD(), d = xml(B.text(sheet.file)), sd = d.getElementsByTagName("sheetData")[0];
-  const header = [...sd.getElementsByTagName("row")].find(r => r.getAttribute("r") === "1");
-  // counts of the items added here (an imported item is already counted in the file)
-  const counted = {};
-  td.items.forEach(x => {
-    if (x.imported) return;
-    const s = source(x.code), dt = codeDate(x); if (!s || !dt) return;
-    const k = monthCode(dt) + "|" + s.row; (counted[k] ||= {})[dt.getDate()] = (counted[k][dt.getDate()] || 0) + 1;
-  });
-  const blocks = () => {
-    const out = new Map();
-    [...sd.getElementsByTagName("row")].forEach(row => {
-      if (row === header) return;
-      const c = rowCells(row), mc = String(cellVal(B, c[2])).trim();
-      if (/^\d{5}$/.test(mc)) (out.get(mc) || out.set(mc, []).get(mc)).push({ row, label: String(cellVal(B, c[4])) });
-    });
-    return out;
-  };
-  let bl = blocks(), last = Math.max(1, ...rowMap(sd).keys());
-  const monthOf = mc => new Date(2000 + +mc.slice(1, 3), +mc.slice(3) - 1, 1);
-  const have = [...bl.keys()].sort(), want = Object.keys(counted).map(k => k.split("|")[0]).sort();
-  let m = have.length ? monthOf(have[have.length - 1]) : monthOf(want[0] || monthCode(DAY));
-  if (have.length) m = new Date(m.getFullYear(), m.getMonth() + 1, 1);
-  // new months: copy the newest month's rows (or the standard 8 rows), values cleared, sums rewritten
-  for (; m <= DAY; m = new Date(m.getFullYear(), m.getMonth() + 1, 1)) {
-    const prev = have.length ? bl.get([...bl.keys()].sort().pop()) : STAT_ROWS.map(s => ({ row: header, label: s[1], fresh: true }));
-    const first = last + 1;
-    prev.forEach(p => {
-      const r = ++last, row = d.createElementNS(NS, "row"), src = rowCells(p.row), kind = statKind(p.label);
-      row.setAttribute("r", r);
-      ["s", "customFormat", "ht", "customHeight"].forEach(a => { if (!p.fresh && p.row.getAttribute(a)) row.setAttribute(a, p.row.getAttribute(a)); });
-      const st = k => src[k] && src[k].getAttribute("s");
-      const c3 = p.fresh ? 1 : cellVal(B, src[3]);
-      row.append(cell(d, "A" + r, st(1), "num", bizYear(m)), cell(d, "B" + r, st(2), "num", monthCode(m)));
-      row.append(cell(d, "C" + r, st(3), "num", kind.sum ? "" : c3));   // 汇总 rows get their sums below
-      row.append(cell(d, "D" + r, st(4), "str", p.label));
-      for (let day = 1; day <= 31; day++) row.append(cell(d, colName(DAY_COL(day)) + r, st(DAY_COL(day)), "num", ""));
-      const hadSum = p.fresh ? !kind.open : src[SUM_COL] && src[SUM_COL].getElementsByTagName("f").length;
-      if (hadSum) row.append(cell(d, "AJ" + r, st(SUM_COL), "f", `SUM(E${r}:AI${r})`));
-      // anything right of AJ (notes like 若无适合此行…) is copied as it was
-      Object.keys(src).map(Number).filter(k => k > SUM_COL).sort((a, b) => a - b).forEach(k => {
-        const e = src[k].cloneNode(true); e.setAttribute("r", colName(k) + r); e.getElementsByTagName("f").length || row.append(e);
-      });
-      sd.append(row);
-    });
-    // 汇总 rows: sum of the rows of the same letter just above them
-    for (let r = first; r <= last; r++) {
-      const row = rowMap(sd).get(r), label = String(cellVal(B, rowCells(row)[4])), kind = statKind(label);
-      if (!kind.sum) continue;
-      let top = r;
-      while (top - 1 >= first) {
-        const l = String(cellVal(B, rowCells(rowMap(sd).get(top - 1))[4])).trim();
-        if (l[0] !== kind.sum || l.includes("汇总") || l.includes("未完成")) break;
-        top--;
-      }
-      if (top === r) continue;
-      [3, ...Array.from({ length: 31 }, (_, i) => DAY_COL(i + 1)), SUM_COL].forEach(k => setCell(d, row, colName(k) + r, "f", `SUM(${colName(k)}${top}:${colName(k)}${r - 1})`));
-    }
-    bl = blocks(); have.push(monthCode(m));
-  }
-  // write the numbers
-  const fillFrom = td.importDay ? fromIso(td.importDay) : null;
-  bl.forEach((rows, mc) => {
-    const mo = monthOf(mc), days = new Date(mo.getFullYear(), mo.getMonth() + 1, 0).getDate();
-    rows.forEach(({ row, label }) => {
-      const kind = statKind(label), c = rowCells(row), r = row.getAttribute("r");
-      if (!kind.key && !kind.open) return;
-      for (let day = 1; day <= days; day++) {
-        const date = new Date(mo.getFullYear(), mo.getMonth(), day); if (date > DAY) break;
-        const ref = colName(DAY_COL(day)) + r, cur = c[DAY_COL(day)], v = cellVal(B, cur);
-        if (cur && cur.getElementsByTagName("f").length) continue;
-        if (kind.open) { const n = (td.openLog || {})[iso(date)]; if (v === "" && n) setCell(d, row, ref, "num", n[kind.open]); continue; }
-        const n = (counted[mc + "|" + kind.key] || {})[day];
-        if (n && n > (+v || 0)) setCell(d, row, ref, "num", n);
-        else if (v === "" && WORKDAYS.includes(date.getDay()) && (!fillFrom || date >= fillFrom)) setCell(d, row, ref, "num", 0);
-      }
-    });
-  });
-  const dim = d.getElementsByTagName("dimension")[0]; if (dim) dim.setAttribute("ref", dim.getAttribute("ref").replace(/\d+$/, last));
-  filterRecentMonths(B, sheet, d, sd, last);
-  B.put(sheet.file, xmlText(d));
-}
-
-// 02新增统计 for a list that never came from an imported Excel (built-in file): rebuilt, 8 rows per month (A/B x 单独/大群/小群 + 汇总), one column per day, sums as formulas
+// 02新增统计 is recounted from the task list on every download, nothing of the old sheet is kept but its look
+// (owner, 2026-11-26): 8 rows per month (A/B x 单独/大群/小群 + 汇总; only the 4 A rows without a 01间接上级 sheet),
+// one column per day, 0 on past Mon-Fri, Sat/Sun empty, sums as formulas (empty when the day has no numbers)
 function statValues() {
   const out = {}, td = TD();
   Object.entries(td.statsBase || {}).forEach(([k, days]) => { out[k] = { ...days }; });
   const counted = {};
   td.items.forEach(x => {
     const s = source(x.code), d = codeDate(x); if (!s || !d) return;
-    const k = monthCode(d) + "|" + s.row; (counted[k] ||= {})[d.getDate()] = (counted[k][d.getDate()] || 0) + 1;
+    const k = monthCode(d) + "|" + statRow(s); (counted[k] ||= {})[d.getDate()] = (counted[k][d.getDate()] || 0) + 1;
   });
   Object.entries(counted).forEach(([k, days]) => { out[k] ||= {}; Object.entries(days).forEach(([day, n]) => { out[k][day] = Math.max(out[k][day] || 0, n); }); });
   return out;
@@ -2119,8 +2067,19 @@ function fillStatsRebuild(B, sheet) {
   const d = xml(B.text(sheet.file)), sd = d.getElementsByTagName("sheetData")[0];
   const rows = [...sd.getElementsByTagName("row")];
   const header = rows.find(r => r.getAttribute("r") === "1");
-  const tpl = k => rows.find(r => +r.getAttribute("r") === 2 + k) || rows.find(r => +r.getAttribute("r") === 2) || header;
-  const styles = STAT_ROWS.map((_, k) => ({ row: tpl(k), st: styleMap(tpl(k)) }));
+  const label = r => { const c = rowCells(r)[4]; return c ? String(cellVal(B, c)).trim() : ""; };
+  // the look of each kind of row comes from the first row with that label (else row 2)
+  const tpl = l => rows.find(r => r !== header && label(r) === l) || rows.find(r => +r.getAttribute("r") === 2) || header;
+  // every day cell of a row gets the style most of its day cells have (older versions left some without borders)
+  const look = t => {
+    const st = styleMap(t), n = {};
+    for (let day = 1; day <= 31; day++) { const v = st[4 + day]; if (v && v !== "0") n[v] = (n[v] || 0) + 1; }
+    const day = (Object.entries(n).sort((x, y) => y[1] - x[1])[0] || [])[0];
+    if (day) for (let k = 1; k <= 31; k++) st[4 + k] = day;
+    return st;
+  };
+  const defs = STAT_ROWS.filter(([key]) => hasBoss() || key[0] !== "B");
+  const styles = defs.map(([, l]) => ({ row: tpl(l), st: look(tpl(l)) }));
   rows.forEach(r => { if (r !== header) sd.removeChild(r); });
   const vals = statValues();
   // months: from the first one with data to this month
@@ -2129,7 +2088,7 @@ function fillStatsRebuild(B, sheet) {
   let r = 2;
   while (m <= DAY) {
     const mc = monthCode(m), days = new Date(m.getFullYear(), m.getMonth() + 1, 0).getDate();
-    STAT_ROWS.forEach(([key, label], k) => {
+    defs.forEach(([key, label], k) => {
       const { row: t, st } = styles[k], row = d.createElementNS(NS, "row"), sum = key.length === 1;
       row.setAttribute("r", r);
       ["s", "customFormat", "ht", "customHeight"].forEach(a => { if (t && t !== header && t.getAttribute(a)) row.setAttribute(a, t.getAttribute(a)); });
@@ -2138,7 +2097,7 @@ function fillStatsRebuild(B, sheet) {
         cell(d, "D" + r, st[4], "str", label));
       for (let day = 1; day <= 31; day++) {
         const col = colName(4 + day), date = new Date(m.getFullYear(), m.getMonth(), day);
-        if (sum) { row.append(cell(d, col + r, st[4 + day], "f", `SUM(${col}${r - 3}:${col}${r - 1})`)); continue; }
+        if (sum) { row.append(cell(d, col + r, st[4 + day], "f", `IF(COUNT(${col}${r - 3}:${col}${r - 1}),SUM(${col}${r - 3}:${col}${r - 1}),"")`)); continue; }
         const v = (vals[mc + "|" + key] || {})[day];
         const fill = day <= days && date <= DAY && WORKDAYS.includes(date.getDay());
         row.append(cell(d, col + r, st[4 + day], "num", v != null ? v : fill ? 0 : ""));
@@ -2212,7 +2171,7 @@ async function buildXlsx() {
     const sh = B.sheets.find(s => s.name === f.name);
     if (sh) fillInPlace(B, sh, td.items.filter(x => sheetOf(x) === f.name).sort(order), f.cols);
   });
-  if (B.stats) { if (td.templateId) fillStats(B, B.stats); else fillStatsRebuild(B, B.stats); }
+  if (B.stats) fillStatsRebuild(B, B.stats);
   // formulas changed: Excel recalculates on opening; the old calculation chain is dropped
   const calc = B.wb.getElementsByTagName("calcPr")[0]; if (calc) calc.setAttribute("fullCalcOnLoad", "1");
   B.put("xl/workbook.xml", xmlText(B.wb));
@@ -2245,6 +2204,8 @@ async function importXlsx(file) {
   const finish = (x, st) => {
     if (isOk(st) && status(x) !== "OK") x.keptOk = true;
     if (!x.got) { const d = pastDate(x.code.slice(0, 4), x.xDate ? fromIso(x.xDate) : DAY); x.got = d ? iso(d) : today(); }
+    // an open task with an empty 进展备注 gets the first action line every task starts with (owner, 2026-11-26)
+    if (!x.notes.trim() && status(x) !== "OK") { x.notes = mmdd(fromIso(x.got)) + "已查收"; x.edited = true; }
     items.push(x);
   };
   [B.direct, B.indirect].forEach(sh => {
@@ -2274,7 +2235,7 @@ async function importXlsx(file) {
         cats: cols.cats.map(k => String(c[k] || "").trim()), srcRow: r, ord: items.length, imported: true, comment: notes[r] || "" }, c[cols.st]);
     });
   });
-  return { items, fsheets, bytes: new Uint8Array(buf) };
+  return { items, fsheets, bytes: new Uint8Array(buf), hasBoss: !!B.indirect };
 }
 
 // ---------- 评估单 (sample evaluation) ----------
@@ -2510,7 +2471,7 @@ document.getElementById("xlsxIn").addEventListener("change", async e => {
     if (!confirm(`读到 ${r.items.length} 条记录（未结 ${open} 条）。用这个文件替换现在的日常清单？（这个文件也会成为以后下载的样子）`)) return;
     let id;
     try { id = await storeTemplate(r.bytes); } catch (err) { toast("浏览器存不下这个文件，没有导入：" + err.message); return; }
-    td.items = r.items; td.fsheets = r.fsheets; td.templateId = id; td.importDay = today(); delete td.statsBase;
+    td.items = r.items; td.fsheets = r.fsheets; td.templateId = id; td.importDay = today(); td.hasBoss = r.hasBoss; delete td.statsBase;
     // the imported file's name without its date part becomes the file name
     const m = f.name.replace(/\.xlsx$/i, "").match(/^(.*?)-\d{6,8}(-\d+)?$/); if (m) td.fileBase = m[1];
     IMAGES = null; openFolds = {};

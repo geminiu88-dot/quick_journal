@@ -70,7 +70,15 @@ exact format on the right, made from the form. 「复制日志」 copies that te
   date. 先前已传 = 1 (row hidden by the filter) at the first download after the day it was closed (打X登记日期 before today; 须知 6). The journal's
   `*组内日常清单表` line is filled from this list.
   The big boss is everyone's direct boss too: `G` (to the whole group) goes on
-  01直接上级, no letter (to one person) on his own sheet, 01间接上级.
+  01直接上级, no letter (to one person) on his own sheet, 01间接上级. A file
+  without a 01间接上级 sheet has no boss list: no boss line, no column, no B rows
+  in 02新增统计, and codes with no letter count as A 单独通知.
+- **New tasks** start with the action line `MMDD已查收`; an open task with an
+  empty 进展备注 gets it at import (its received date).
+- **Plan date on a to-do card:** the bar under the notes shows the last line's
+  date → a 4-digit plan box (date spelled out, like the journal). The box
+  writes/replaces the plan date at the end of the last line; an open task whose
+  last line has none is flagged.
 - **Kanban:** one column per list side by side: 直接上级, 间接上级 ·
   大老板, and each F tracking sheet in use. In each column: 要处理 (overdue, no
   plan date, no record; for an F sheet: not updated on its review day, read
@@ -84,14 +92,14 @@ exact format on the right, made from the form. 「复制日志」 copies that te
   (so Excel comments, pictures and hidden rows stay right), only rows edited
   here are rewritten, new items go at the bottom, and items that came from the
   file can't be deleted. 状态 OK in the file counts as closed even without the X
-  (older items). 02新增统计 keeps each person's own rows (deleted rows stay
-  deleted); only counts of items added here are written, `未完成` rows are
-  filled from the open items of each day the page was opened, and a new month
-  copies the rows of the month before. Untouched sheets go out byte for byte.
+  (older items). **02新增统计 is recounted from the task list at every download**
+  (nothing of the old sheet is kept but its look): 8 rows per month (4 without
+  01间接上级), from the first month with a task to now; 0 on past Mon-Fri, Sat/Sun
+  empty (no holidays); every day cell of a row gets the row's bordered style;
+  汇总 days are empty when there are no numbers. Untouched sheets go out byte for byte.
   「导入Excel」 reads your current file once and makes it the template, kept in
   this browser's IndexedDB (room for big files; localStorage holds ~5 MB). A
-  list never imported uses the built-in file the old way (rows rebuilt, 02: 8
-  rows per month). The built-in template
+  list never imported uses the built-in file. The built-in template
   (`DEFAULT_XLSX`) is the group's file with the example rows, the 须知 pictures
   and author names removed. No library: the browser unzips/zips the file.
 - **Client numbers from the old system:** 「粘贴系统数量」 in the C1有单老客
