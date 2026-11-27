@@ -112,24 +112,29 @@ exact format on the right, made from the form. 「复制日志」 copies that te
   Only clients already in the journal are filled; a product line with no
   order in either year is left out; changed boxes get a blue frame with the
   old value as a tooltip. Nothing about the old system is stored in this page.
-- **尺码 tab** (`sizes.html`, loaded in a frame): four boxes, mm, EU, UK and US;
-  type a size in any box and the others show the same size; a size not in
-  the chart shows the nearest. UK and US have a small switch for the part of
-  their scale (kids' sizes start again from 1); the part picked is used
-  while it has the size, else the box moves to one that has it; the same
-  size in the box's other parts is shown under it. A menu picks the chart:
-  **Nike 凉鞋** (Nike's sandal + kids charts) or **Crocs** (crocs.com.my,
-  whole sizes, EU as ranges, kids in US only), copied from the brands' sites
-  on 2026-11-27, links in the page's 怎么换算的？ note. EU/UK/US come only from
-  those charts; **mm = EU ÷ 0.15** (owner's rule: shoe/last length, not foot
-  length) is the one formula; a number under 60 in the mm box is read as cm
-  (25 = 250 mm). When a half size is typed or shown, a line says what to do
-  without half sizes: adult sandals one size down, kids one size up
-  (Crocs/Nike advice), client rule wins. Nike gives the same pair different
-  EU/UK in its men's and women's tables, so both are kept and the US 男/女
-  switch picks which wins. Client charts later: imported from Excel and kept
-  in the browser; never type a client's chart into the file (this repo is
-  public).
+- **尺码 tab** (`sizes.html`, loaded in a frame; 自动 + Clarks/Birkenstock on test in `preview/` since 2026-11-27): four boxes, mm, EU, UK and US;
+  type a size in any box and the others show the same size. UK and US have a
+  small switch for the part of their scale (kids' sizes start again from 1);
+  the part picked is used while it has the size, else the box moves to one
+  that has it; the same size in the box's other parts is shown under it. A
+  menu picks the chart. Default **自动**: the box you type in picks the chart
+  of that market's big brand (EU and mm: Birkenstock, adults only, then
+  Clarks for kids; UK: Clarks; US: Nike); the first chart that has the exact
+  size wins, else the closest; the page says which chart it used. So every
+  whole size is found except EU 18 and UK baby 0-3. Also in the menu: **Nike
+  凉鞋**, **Clarks** (clarks.com.au), **Birkenstock** (US by its own rule
+  US+31/+33 = EU, UK from UK shops as its GB site can't be read), **Crocs**
+  (crocs.com.my, whole sizes, EU as ranges, kids in US only; not in 自动). All
+  copied on 2026-11-27, links in the page's 怎么换算的？ note. EU/UK/US come only
+  from those charts; **mm = EU ÷ 0.15** (owner's rule: shoe/last length, not
+  foot length) is the one formula; a number under 60 in the mm box is read
+  as cm. A size between two chart sizes names both and picks by the half-
+  size rule (kids the bigger, adults the smaller); when a half size is
+  shown, a line says what to do without half sizes. Nike gives the same pair
+  different EU/UK in its men's and women's tables, so both are kept and the
+  US 男/女 switch picks which wins. Client charts later: imported from Excel
+  and kept in the browser; never type a client's chart into the file (this
+  repo is public).
 - **评估单 tab** (sample evaluation, 鞋N评估单-客户-描述.txt): boxes for the
   values, the numbered text 1）…12） written by the page; 产品线 鞋1 夏季凉鞋 /
   鞋2 室内软拖鞋; names under 10） kept as chips. Saved on this PC with the
