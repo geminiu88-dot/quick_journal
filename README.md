@@ -112,20 +112,22 @@ exact format on the right, made from the form. 「复制日志」 copies that te
   Only clients already in the journal are filled; a product line with no
   order in either year is left out; changed boxes get a blue frame with the
   old value as a tooltip. Nothing about the old system is stored in this page.
-- **尺码 tab** (on test in `preview/` only, 2026-11-27; `sizes.html`, loaded in a frame): four boxes, mm, EU, UK and
-  US; type a size in any box and the others show the same size; a size not in
-  the chart shows the nearest. UK and US number kids' sizes again from the
-  start, so their boxes have a small switch (UK 小童 / 大童/成人, US 小童 C /
-  大童 Y / 女 / 男, `BOXES`): the part you pick is used while it has the
-  size, else the box moves to a part that has it; the same size in the box's
-  other parts is shown under it. Boys and girls share kids' numbers. Built in:
-  one common chart (EU 16-48, mm = foot length), typical retail numbers,
-  marked 参考 (a client's own chart wins). The `CHARTS` list at the top of its
-  script is where client charts will go later, imported from Excel and kept
-  in the browser: never type a client's chart into the file (this repo is
-  public). No formula: sizes come only from the chart; a 怎么换算的？ fold-out
-  explains this and the systems' definitions (EU = last cm × 1.5, UK = last
-  inches × 3 − 25 / kids − 12, US ≈ UK + 1 men / + 2~2.5 women).
+- **尺码 tab** (on test in `preview/` only, 2026-11-27; `sizes.html`, loaded
+  in a frame): four boxes, mm, EU, UK and US; type a size in any box and the
+  others show the same size; a size not in the chart shows the nearest. UK
+  and US have a small switch for the part of their scale (kids' sizes start
+  again from 1); the part picked is used while it has the size, else the box
+  moves to one that has it; the same size in the box's other parts is shown
+  under it. A menu picks the chart: **Nike 凉鞋** (Nike's sandal + kids
+  charts) or **Crocs** (crocs.com.my, whole sizes, EU as ranges, kids in US
+  only), copied from the brands' sites on 2026-11-27, links in the page's
+  怎么换算的？ note. EU/UK/US come only from those charts; **mm = EU ÷ 0.15**
+  (owner's rule: shoe/last length, not foot length) is the one formula; a
+  number under 60 in the mm box is read as cm (25 = 250 mm). Nike
+  gives the same pair different EU/UK in its men's and women's tables, so
+  both are kept and the US 男/女 switch picks which wins. Client charts later:
+  imported from Excel and kept in the browser; never type a client's chart
+  into the file (this repo is public).
 - **评估单 tab** (sample evaluation, 鞋N评估单-客户-描述.txt): boxes for the
   values, the numbered text 1）…12） written by the page; 产品线 鞋1 夏季凉鞋 /
   鞋2 室内软拖鞋; names under 10） kept as chips. Saved on this PC with the
