@@ -112,7 +112,7 @@ exact format on the right, made from the form. 「复制日志」 copies that te
   Only clients already in the journal are filled; a product line with no
   order in either year is left out; changed boxes get a blue frame with the
   old value as a tooltip. Nothing about the old system is stored in this page.
-- **尺码 tab** (`sizes.html`, loaded in a frame; 自动 + Clarks/Birkenstock on test in `preview/` since 2026-11-27): four boxes, mm, EU, UK and US;
+- **尺码 tab** (`sizes.html`, loaded in a frame): four boxes, mm, EU, UK and US;
   type a size in any box and the others show the same size. UK and US have a
   small switch for the part of their scale (kids' sizes start again from 1);
   the part picked is used while it has the size, else the box moves to one
