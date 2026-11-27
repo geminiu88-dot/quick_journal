@@ -123,7 +123,9 @@ exact format on the right, made from the form. 「复制日志」 copies that te
   marked 参考 (a client's own chart wins). The `CHARTS` list at the top of its
   script is where client charts will go later, imported from Excel and kept
   in the browser: never type a client's chart into the file (this repo is
-  public).
+  public). No formula: sizes come only from the chart; a 怎么换算的？ fold-out
+  explains this and the systems' definitions (EU = last cm × 1.5, UK = last
+  inches × 3 − 25 / kids − 12, US ≈ UK + 1 men / + 2~2.5 women).
 - **评估单 tab** (sample evaluation, 鞋N评估单-客户-描述.txt): boxes for the
   values, the numbered text 1）…12） written by the page; 产品线 鞋1 夏季凉鞋 /
   鞋2 室内软拖鞋; names under 10） kept as chips. Saved on this PC with the
