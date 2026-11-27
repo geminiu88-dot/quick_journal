@@ -95,11 +95,12 @@
   .tabs { display: inline-flex; margin-right: 8px; }
   .tabs button { border-radius: 0; }
   .tabs button:first-child { border-radius: 6px 0 0 6px; } .tabs button:last-child { border-radius: 0 6px 6px 0; margin-left: -1px; }
-  body[data-tab="journal"] #tabJournal, body[data-tab="todo"] #tabTodo, body[data-tab="eval"] #tabEval, body[data-tab="erp"] #tabErp { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  body[data-tab="journal"] #tabJournal, body[data-tab="todo"] #tabTodo, body[data-tab="eval"] #tabEval, body[data-tab="erp"] #tabErp, body[data-tab="sizes"] #tabSizes { background: var(--ink); color: var(--paper); border-color: var(--ink); }
   body[data-tab="journal"] .tonly, body[data-tab="todo"] .jonly, body[data-tab="eval"] .tonly, body[data-tab="eval"] .jonly,
   body:not([data-tab="eval"]) .eonly, body[data-tab="erp"] .jonly, body[data-tab="erp"] .tonly,
-  body:not([data-tab="erp"]) .xonly { display: none !important; }
-  .xonly iframe { width: 100%; height: calc(100vh - 90px); border: 0; }
+  body:not([data-tab="erp"]) .xonly, body[data-tab="sizes"] .jonly, body[data-tab="sizes"] .tonly,
+  body:not([data-tab="sizes"]) .sonly { display: none !important; }
+  .xonly iframe, .sonly iframe { width: 100%; height: calc(100vh - 90px); border: 0; }
   .tabs button:not(:first-child) { margin-left: -1px; }
   .evhead { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 10px; }
   .evhead select { min-width: 260px; }
@@ -224,7 +225,7 @@
 </head>
 <body>
 <div class="bar">
-  <span class="tabs"><button id="tabJournal">日志</button><button id="tabTodo">日常清单</button><button id="tabEval">评估单</button><button id="tabErp">旧ERP书签</button></span>
+  <span class="tabs"><button id="tabJournal">日志</button><button id="tabTodo">日常清单</button><button id="tabEval">评估单</button><button id="tabErp">旧ERP书签</button><button id="tabSizes">尺码</button></span>
   日期 <input type="date" id="day">
   <span class="jonly"><button class="main" id="copy">复制日志</button>
   <button id="week" title="把每周回顾的日期和统计数字更新到今天">周五更新统计</button>
@@ -252,6 +253,7 @@
   <div id="todo" class="tonly"></div>
   <!-- made by smol_system tools/erp_bookmarks/build_install.py; loaded when the tab opens -->
   <div class="xonly"><iframe id="erpFrame" title="旧ERP书签"></iframe></div>
+  <div class="sonly"><iframe id="sizesFrame" title="尺码"></iframe></div>
   <div class="jgrid eonly">
     <div id="evForm"></div>
     <div class="prevwrap">
@@ -2431,6 +2433,7 @@ function showEval() {
 }
 document.getElementById("tabEval").addEventListener("click", () => tab("eval"));
 document.getElementById("tabErp").addEventListener("click", () => tab("erp"));
+document.getElementById("tabSizes").addEventListener("click", () => tab("sizes"));
 document.getElementById("evIn").addEventListener("change", async ev => {
   const files = [...ev.target.files]; if (!files.length) return;
   const done = [], bad = [];
@@ -2463,6 +2466,8 @@ function tab(name) {
   if (name === "eval") renderEval();
   const erpFrame = document.getElementById("erpFrame");
   if (name === "erp" && !erpFrame.src) erpFrame.src = "erp.html";
+  const sizesFrame = document.getElementById("sizesFrame");
+  if (name === "sizes" && !sizesFrame.src) sizesFrame.src = "sizes.html";
 }
 document.getElementById("tabJournal").addEventListener("click", () => { tab("journal"); render(); });
 document.getElementById("tabTodo").addEventListener("click", () => tab("todo"));
