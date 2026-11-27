@@ -73,6 +73,8 @@ exact format on the right, made from the form. 「复制日志」 copies that te
   01直接上级, no letter (to one person) on his own sheet, 01间接上级. A file
   without a 01间接上级 sheet has no boss list: no boss line, no column, no B rows
   in 02新增统计, and codes with no letter count as A 单独通知.
+  The sheet a task is on follows its code, not the sheet it was on in the
+  imported file (owner, 2026-11-27).
 - **New tasks** start with the action line `MMDD已查收`; an open task with an
   empty 进展备注 gets it at import (its received date).
 - **Plan date on a to-do card:** the bar under the notes shows the last line's
@@ -88,15 +90,10 @@ exact format on the right, made from the form. 「复制日志」 copies that te
 - 「下载Excel」 saves as `<file name>-YYYYMMDD.xlsx`, e.g.
   `日常清单-B01组-15.Arthur-20261019.xlsx`: the name is editable on the tab
   (taken from the imported file), the date is always today. Built from a
-  template file. **An imported file is changed in place:** its rows never move
-  (so Excel comments, pictures and hidden rows stay right), only rows edited
-  here are rewritten, new items go at the bottom, and items that came from the
-  file can't be deleted. 状态 OK in the file counts as closed even without the X
-  (older items). **02新增统计 is recounted from the task list at every download**
-  (nothing of the old sheet is kept but its look): 8 rows per month (4 without
-  01间接上级), from the first month with a task to now; 0 on past Mon-Fri, Sat/Sun
-  empty (no holidays); every day cell of a row gets the row's bordered style;
-  汇总 days are empty when there are no numbers. The 月份 filter shows only this month. Untouched sheets go out byte for byte.
+  template file (the imported one, else the built-in one). What goes where and
+  how it looks: section **日常清单 Excel** below. Items that came from the file
+  can't be deleted. 状态 OK in the file counts as closed even without the X
+  (older items).
   「导入Excel」 reads your current file once and makes it the template, kept in
   this browser's IndexedDB (room for big files; localStorage holds ~5 MB). A
   list never imported uses the built-in file. The built-in template
@@ -147,3 +144,99 @@ exact format on the right, made from the form. 「复制日志」 copies that te
   `tools/erp_bookmarks/build_install.py ../quick_journal`: never edit it
   here. This repo is public: no ERP address, client data or names in it.
 - Not done yet: business-year rollover on 31 Oct (rule 10), other teams' formats.
+
+## 日常清单 Excel
+
+Decided by the owner on 2026-11-27 (a colleague's export had wrong 02新增统计
+numbers; checked against a long-used real file, which stays out of this repo).
+**On preview since 2026-11-27; the main page still keeps the imported layout
+until the release.**
+
+**Which sheet a task goes on** — by its code, at every download:
+- no letter (`1120-01`) → **01日常清单-间接上级** (the big boss's own list); a
+  file without that sheet → 01直接上级.
+- G, A, Z, X (`1124G-01`) → **01日常清单-直接上级**.
+- a code the page can't read (old styles like `1117T01`, `1120-A02`, or no date
+  like `G20-014`) → its own sheet **旧编码-无法识别**, added at the end of the
+  file when needed, same columns as 01直接上级. These tasks are not counted
+  anywhere (not 今天收到, not 02新增统计) and are not on the kanban; a small
+  grey fold under the kanban lists them. Importing the file again reads that
+  sheet back.
+- F tracking sheets: untouched, tasks stay where they are.
+- On each sheet: **oldest code first** (same day: by its number); 旧编码 sheet
+  in the order of the file.
+
+**02新增统计** — recounted from the tasks at every download:
+- Each month gets **the same rows as the last month of the imported sheet**,
+  in that order (a file used for years may have e.g. A单独 / A大群 / A小群 /
+  A汇总 / 直接上级未完成 / B单独 / B汇总 / 间接上级未完成). A file without months
+  uses the 8 standard rows (A and B × 单独/大群/小群 + 汇总). The row kind comes
+  from its label: count row = tasks whose code is from that day (by letter:
+  none → B单独, G/Z → A大群, A → A单独, X → A小群); 汇总 = sum of that letter's
+  count rows above it; **未完成** = tasks of that list still open at the end of
+  that day (closed = 打X登记日期, else the date of its last note line);
+  未完成's 月汇总 stays empty.
+- Months: from the **first month of the imported sheet** (else the first
+  task's month) to this month. Mon-Fri up to today get a number (0 when
+  none), Sat/Sun stay empty (no holidays). The 月份 filter shows this month.
+
+**Never lose a task** (owner, 2026-11-27): the page keeps a running count
+(tasks at import, +1 per task added, −1 per task deleted with ×). Every
+download reads its own new Excel back before saving it and checks: count =
+tasks in the list = tasks in the file, and every task of the list is in the
+file (same code, description, notes). If not, a red warning names what is
+missing, with 「仍然下载」/「取消」.
+
+**Formatting must stay right** (owner: noticeable mistakes make the tool look
+untrustworthy). What a download keeps, checked by `tests/test_export.py`:
+- **Each task keeps the look of its own row** in the imported file, also when
+  it moves to another sheet: fonts (微软雅黑 / 等线 as it was), fill colours
+  (yellow/red highlights), borders, wrap, date format of 打X登记日期, row height,
+  extra columns. A task not changed here goes out with its cells exactly as
+  they were (coloured words inside a cell too). A changed task gets new values
+  in its row's styles and a height fitted to its text. A new task takes the
+  look most rows of that sheet have.
+- **Excel comments move with their task** (text, author, box size).
+- Kept per sheet: header row, column widths, frozen header, the 先前已传 filter
+  (rows with 1 hidden), tab colour, zoom.
+- 02新增统计: every row has the look (fill colour, borders, font, height) of
+  the row with the same label in the file's last month, e.g. yellow 未完成 rows;
+  the day cells of a row all get one bordered style.
+- Sheets the page doesn't fill (03, 须知, F sheets' pictures) go out byte for
+  byte. Excel recalculates formulas on opening.
+
+## Tests
+
+**Run them before every release to live** (every push to `main`, which is
+what colleagues use); release only when they all pass:
+
+    python tests/run.py                 # all, about 15 seconds
+    python tests/run.py test_todo       # one file
+    python tests/run.py --preview       # the pages in preview/: before a preview goes live
+
+While something is on preview, the tests describe the preview: run them with
+`--preview`; the main page may fail the new ones until the release.
+
+They need Python with `playwright` (and its Chromium) and `openpyxl`: the
+smol_system development setup has both, so on the office PC:
+`~/smol_system/.venv/bin/python tests/run.py`.
+
+How they work: a hidden Chrome opens `index.html` / `sizes.html` straight from
+the folder (offline, like double-clicking it), with an empty browser memory
+and a **pretend date** (so Friday, Monday, a new day can be checked any day).
+Each test changes only what it checks and reads the result: the journal
+text, the counts, the downloaded Excel, the size boxes. A script error on the
+page fails the test. Only made-up data: never a colleague's real file here
+(this repo is public).
+
+| File | Checks |
+|---|---|
+| `tests/test_journal.py` | journal text (hours, +/-, X, plan dates, spaces, C1 count), new day / Friday / new week, import round trip, own lines, backup |
+| `tests/test_todo.py` | 日常清单: codes in messages, OK/G, the 组内/老板 count lines, 传递, Excel download from the built-in file |
+| `tests/test_export.py` | 日常清单 Excel with an imported file (`tests/todo_file.py`, made up): sheets by code, 旧编码 sheet, order, look + comments kept, 02 layout/colours/counts/未完成, read back, missing-task warning |
+| `tests/test_sizes.py` | 尺码: a table of known sizes per chart (change it when a chart changes on purpose), mm = EU ÷ 0.15, half-size rule |
+| `tests/test_tabs.py` | every tab opens, erp.html and sizes.html load, 评估单 text reads back |
+
+(The usual way for a JavaScript page is Node + npm with tests in JavaScript;
+these are in Python because the smol_system setup already has everything,
+and the page stays one file. `tests/browser.py` holds the shared helpers.)
