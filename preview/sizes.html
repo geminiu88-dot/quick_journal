@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>尺码换算</title>
+<style>
+  /* same colours as the journal (index.html) */
+  :root {
+    --bg: #f3f1ec; --paper: #ffffff; --ink: #1d1d1b; --muted: #8a877f;
+    --edit: #fff6c8; --edit-line: #e2c94a; --calc: #e6f0fb; --bad-line: #d2433a;
+    --ui: #2f6fb3; --border: #d9d5cc;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1b1b1a; --paper: #262624; --ink: #ecebe6; --muted: #9a978f;
+      --edit: #4a4320; --edit-line: #a8902c; --calc: #233447; --bad-line: #ff8379;
+      --ui: #8ab8ea; --border: #44423d;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1b1b1a; --paper: #262624; --ink: #ecebe6; --muted: #9a978f;
+    --edit: #4a4320; --edit-line: #a8902c; --calc: #233447; --bad-line: #ff8379;
+    --ui: #8ab8ea; --border: #44423d;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.6 "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif; }
+  main { max-width: 1200px; margin: 16px auto; padding: 0 16px; }
+  .doc { background: var(--paper); border: 1px solid var(--border); border-radius: 4px; padding: 20px 28px; margin-bottom: 16px; }
+  h2 { margin: 0 0 4px; font-size: 18px; display: flex; align-items: baseline; gap: 12px; }
+  h2 small { font-size: 13px; font-weight: normal; color: var(--muted); }
+  select { font: inherit; font-size: 13px; padding: 1px 4px; border: 1px solid var(--border); border-radius: 4px;
+    background: var(--paper); color: var(--ink); }
+  .hint { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
+  /* one box per system; UK and US have a small switch for the part of their scale */
+  .boxes { display: flex; flex-wrap: wrap; gap: 14px 28px; align-items: flex-start; }
+  .head { display: flex; align-items: center; gap: 8px; height: 26px; font-size: 13px; color: var(--muted); }
+  .seg { display: inline-flex; }
+  .seg button { font: inherit; font-size: 12px; padding: 0 8px; line-height: 20px; border: 1px solid var(--border);
+    background: var(--paper); color: var(--muted); cursor: pointer; margin-left: -1px; }
+  .seg button:first-child { border-radius: 4px 0 0 4px; margin-left: 0; }
+  .seg button:last-child { border-radius: 0 4px 4px 0; }
+  .seg button.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .boxes input { width: 110px; font: inherit; font-size: 20px; font-weight: bold; text-align: center;
+    padding: 2px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--calc); color: var(--ink); }
+  .boxes input.typed { background: var(--edit); border-color: var(--edit-line); }
+  .boxes input:focus { outline: none; box-shadow: 0 0 0 2px var(--edit-line); }
+  .also { font-size: 12px; color: var(--muted); min-height: 1.6em; margin-top: 2px; }
+  .near { min-height: 1.6em; margin: 8px 0 0; font-size: 13px; color: var(--bad-line); }
+</style>
+</head>
+<body>
+<main>
+  <div class="doc">
+    <h2>尺码换算 <small>尺码表：<select id="chart"></select><span id="chartName"></span></small></h2>
+    <p class="hint">在任何一个框里输入尺码，其它框自动换算。</p>
+    <div class="boxes" id="boxes"></div>
+    <p class="near" id="near" style="margin:0"></p>
+    <p class="hint" style="margin:4px 0 0">参考表：各品牌、各客人的尺码表不一样，有客人的表就以客人的为准。mm = 脚长（不是中底长）。童鞋男女同码。</p>
+  </div>
+</main>
+
+<script>
+// Shoe size converter, shown in the journal's 尺码 tab (index.html loads this
+// file in a frame). Works on its own too: open sizes.html.
+// One box per system: type a size in any box and the others show the same size.
+// UK and US number kids' sizes again from the start, so their boxes have a
+// small switch (BOXES): the part you pick is used while it has the size;
+// when it hasn't (US 女 for a kid's size), the box moves to a part that has.
+// Under a box: the same size in its other parts.
+//
+// CHARTS holds every chart. Only the common chart (通用) is built in: public,
+// typical numbers, NOT any client's data (this site is public). A client's own
+// chart will later be imported from Excel in the browser (kept on that PC,
+// like the journal) and added to CHARTS; it must never be put in this file.
+//
+// A chart: titles = system names, rows = one size per row, same order; ''
+// where a system has no such size. mm = foot length (脚长), not insole length.
+// Kids' US and UK numbers start over, so each part has its own column and
+// every size is in exactly one column: UK 小童 0-13.5 then UK 1 runs on into adults;
+// US 小童 = C sizes 0-13.5, US 大童 = Y sizes 1-7 (same number as US 男).
+// Boys and girls use the same kids' numbers.
+var CHARTS = [{
+  name: '通用（参考）',
+  titles: ['mm', 'EU', 'UK 小童', 'UK', 'US 小童 (C)', 'US 大童 (Y)', 'US 女', 'US 男'],
+  rows: [
+    ['95', '16', '0.5', '', '1', '', '', ''],
+    ['105', '17', '1', '', '2', '', '', ''],
+    ['110', '18', '2', '', '3', '', '', ''],
+    ['115', '19', '3', '', '4', '', '', ''],
+    ['125', '20', '4', '', '5', '', '', ''],
+    ['130', '21', '5', '', '6', '', '', ''],
+    ['135', '22', '6', '', '7', '', '', ''],
+    ['140', '23', '6.5', '', '7.5', '', '', ''],
+    ['145', '24', '7', '', '8', '', '', ''],
+    ['150', '25', '8', '', '9', '', '', ''],
+    ['155', '26', '8.5', '', '9.5', '', '', ''],
+    ['165', '27', '9', '', '10', '', '', ''],
+    ['170', '28', '10', '', '11', '', '', ''],
+    ['175', '29', '11', '', '12', '', '', ''],
+    ['185', '30', '12', '', '13', '', '', ''],
+    ['190', '31', '12.5', '', '13.5', '', '', ''],
+    ['195', '32', '13', '', '', '1', '', ''],
+    ['205', '33', '', '1', '', '2', '', ''],
+    ['215', '34', '', '2', '', '2.5', '', ''],
+    ['225', '35', '', '2.5', '', '3.5', '5', '3.5'],
+    ['230', '36', '', '3.5', '', '4.5', '6', '4.5'],
+    ['235', '37', '', '4', '', '5', '6.5', '5'],
+    ['240', '38', '', '5', '', '6', '7.5', '6'],
+    ['250', '39', '', '6', '', '6.5', '8.5', '6.5'],
+    ['255', '40', '', '6.5', '', '7', '9', '7'],
+    ['260', '41', '', '7', '', '', '9.5', '8'],
+    ['265', '42', '', '8', '', '', '10.5', '8.5'],
+    ['275', '43', '', '9', '', '', '11.5', '9.5'],
+    ['280', '44', '', '9.5', '', '', '12', '10'],
+    ['290', '45', '', '10.5', '', '', '13', '11'],
+    ['295', '46', '', '11', '', '', '', '12'],
+    ['300', '47', '', '12', '', '', '', '13'],
+    ['310', '48', '', '13', '', '', '', '14']
+  ]
+}];
+
+// The boxes: label + the chart columns they show, [column, switch name].
+var BOXES = [
+  {label: 'mm', parts: [[0, '']]},
+  {label: 'EU', parts: [[1, '']]},
+  {label: 'UK', parts: [[2, '小童'], [3, '大童/成人']]},
+  {label: 'US', parts: [[4, '小童 C'], [5, '大童 Y'], [6, '女'], [7, '男']]}
+];
+BOXES.forEach(function (b) { b.want = b.parts.length - 1; b.on = b.want; });   // adult part at first
+
+var chart = CHARTS[0];
+var picked = -1;   // the size (row of the chart) shown in the boxes
+var typedIn = -1;  // the box the user typed in
+var sel = document.getElementById('chart');
+var boxes = document.getElementById('boxes');
+
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, function (c) {
+    return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c];
+  });
+}
+function cell(row, part) { return picked >= 0 ? chart.rows[row][part[0]] : ''; }
+
+// Build the boxes for the current chart.
+function build() {
+  sel.style.display = CHARTS.length > 1 ? '' : 'none';
+  document.getElementById('chartName').textContent = CHARTS.length > 1 ? '' : chart.name;
+  sel.innerHTML = CHARTS.map(function (c, i) {
+    return '<option value="' + i + '"' + (c === chart ? ' selected' : '') + '>' + esc(c.name) + '</option>';
+  }).join('');
+  boxes.innerHTML = BOXES.map(function (b, i) {
+    var seg = b.parts.length < 2 ? '' : '<span class="seg" id="s' + i + '">' + b.parts.map(function (p, k) {
+      return '<button onclick="pickPart(' + i + ',' + k + ')">' + esc(p[1]) + '</button>';
+    }).join('') + '</span>';
+    return '<div><div class="head"><label for="b' + i + '">' + esc(b.label) + '</label>' + seg + '</div>' +
+           '<input id="b' + i + '" inputmode="decimal" autocomplete="off" oninput="typed(' + i + ')">' +
+           '<div class="also" id="a' + i + '"></div></div>';
+  }).join('');
+  picked = -1; typedIn = -1;
+  show('');
+}
+sel.onchange = function () { chart = CHARTS[+sel.value]; build(); };
+
+// A switch clicked: use that part of the scale in this box. If the size shown
+// isn't in that part (a kid's size, then 女), the boxes empty for a new size.
+function pickPart(i, k) {
+  var b = BOXES[i];
+  b.want = k; b.on = k;
+  if (i === typedIn) typed(i);
+  else if (picked >= 0 && cell(picked, b.parts[k])) show(document.getElementById('near').textContent);
+  else { picked = -1; typedIn = i; document.getElementById('b' + i).value = ''; show(''); }
+  document.getElementById('b' + i).focus();
+}
+
+// A size typed in box i: find that row, or the nearest.
+function typed(i) {
+  var b = BOXES[i], col = b.parts[b.on][0];
+  var text = document.getElementById('b' + i).value;
+  var v = parseFloat(text);
+  typedIn = i; picked = -1;
+  var near = '';
+  if (!isNaN(v)) {
+    var gap = Infinity;
+    chart.rows.forEach(function (r, n) {
+      var x = parseFloat(r[col]);
+      if (!isNaN(x) && Math.abs(x - v) < gap) { gap = Math.abs(x - v); picked = n; }
+    });
+    if (gap > 0 && picked >= 0)
+      near = '表里没有 ' + chart.titles[col] + ' ' + text + '，其它框是最接近的 ' + chart.rows[picked][col];
+  }
+  show(near);
+}
+
+// Fill the other boxes: each in the part picked, or else the first part that has the size.
+function show(near) {
+  BOXES.forEach(function (b, i) {
+    if (i !== typedIn && picked >= 0) {
+      b.on = cell(picked, b.parts[b.want]) ? b.want
+           : Math.max(0, b.parts.findIndex(function (p) { return cell(picked, p); }));
+    }
+    var box = document.getElementById('b' + i);
+    box.classList.toggle('typed', i === typedIn);
+    if (i !== typedIn) box.value = picked >= 0 ? (cell(picked, b.parts[b.on]) || '—') : '';
+    var seg = document.getElementById('s' + i);
+    if (seg) [].forEach.call(seg.children, function (btn, k) { btn.classList.toggle('on', k === b.on); });
+    // the same size in this box's other parts
+    document.getElementById('a' + i).textContent = picked < 0 ? '' : b.parts.filter(function (p, k) {
+      return k !== b.on && cell(picked, p);
+    }).map(function (p) { return p[1] + ' ' + cell(picked, p); }).join(' · ');
+  });
+  document.getElementById('near').textContent = near;
+}
+
+build();
+document.getElementById('b1').focus();
+</script>
+</body>
+</html>
